@@ -1,0 +1,14 @@
+openai-agents
+openai
+# keyboard # Removido, substituído por pynput
+pyperclip
+python-dotenv
+pyautogui
+PySide6
+pynput>=1.7.6 # Versão mínima requerida para GlobalHotKeys
+
+# Test dependencies
+pytest
+pytest-mock
+pytest-cov
+pytest-asyncio 
