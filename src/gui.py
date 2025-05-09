@@ -3,7 +3,7 @@ import pyperclip
 import time
 from functools import partial
 
-from PySide6.QtWidgets import QWidget, QPushButton, QVBoxLayout, QLabel, QApplication, QFrame
+from PySide6.QtWidgets import QWidget, QPushButton, QVBoxLayout, QLabel, QApplication, QFrame, QHBoxLayout, QScrollArea, QTextEdit
 from PySide6.QtCore import Qt, Signal, Slot, QSize, QTimer, QPoint
 from PySide6.QtGui import QColor, QPalette, QFont, QIcon, QCursor, QLinearGradient, QBrush
 
@@ -16,8 +16,7 @@ logger = logging.getLogger(__name__)
 
 class TextaGuiWindow(QWidget):
     """
-    Simple GUI window with a 'Corrigir' button that performs the same 
-    function as Ctrl+Alt+C but in a graphical interface.
+    GUI window with a 'Corrigir' button that displays original and corrected text.
     """
     
     # Signal for the button click
@@ -60,10 +59,19 @@ class TextaGuiWindow(QWidget):
                 font-family: 'Segoe UI', Arial, sans-serif;
                 font-size: 14px;
             }
+            QTextEdit {
+                background-color: #1E1E2A;
+                color: #FFFFFF;
+                border-radius: 8px;
+                border: 1px solid #3D3D5C;
+                font-family: 'Segoe UI', Arial, sans-serif;
+                font-size: 14px;
+                padding: 8px;
+            }
         """)
         
-        # Set fixed size for the window
-        self.setFixedSize(220, 260)
+        # Set fixed size for the window (increased size to fit text areas)
+        self.setFixedSize(820, 500)
         
         # Create layout
         self._init_ui()
@@ -75,58 +83,114 @@ class TextaGuiWindow(QWidget):
         # For tracking button state
         self.is_processing = False
         
+        # For storing original and corrected text
+        self.original_text = ""
+        self.corrected_text = ""
+        
         logger.info("TextaGuiWindow initialized.")
 
     def _init_ui(self):
         """Initialize user interface components."""
         # Create main layout
-        self.layout = QVBoxLayout(self)
+        self.layout = QHBoxLayout(self)
         self.layout.setContentsMargins(20, 20, 20, 20)
-        self.layout.setSpacing(10)
+        self.layout.setSpacing(15)
+        
+        # Create side panel for controls
+        self.side_panel = QWidget(self)
+        self.side_panel.setFixedWidth(220)
+        self.side_panel_layout = QVBoxLayout(self.side_panel)
+        self.side_panel_layout.setContentsMargins(10, 10, 10, 10)
+        self.side_panel_layout.setSpacing(10)
         
         # Create title label
-        self.title_label = QLabel("Texta AI", self)
+        self.title_label = QLabel("Texta AI", self.side_panel)
         self.title_label.setAlignment(Qt.AlignCenter)
         self.title_label.setStyleSheet("""
             font-size: 18px;
             font-weight: bold;
             color: #C0C0E0;
         """)
-        self.layout.addWidget(self.title_label)
+        self.side_panel_layout.addWidget(self.title_label)
         
         # Add instruction label
-        self.instruction_label = QLabel("Selecione texto em outro aplicativo\nantes de clicar em Corrigir", self)
+        self.instruction_label = QLabel("Selecione texto em outro aplicativo\nantes de clicar em Corrigir", self.side_panel)
         self.instruction_label.setAlignment(Qt.AlignCenter)
         self.instruction_label.setStyleSheet("""
             font-size: 11px;
             color: #A0A0C0;
         """)
-        self.layout.addWidget(self.instruction_label)
+        self.side_panel_layout.addWidget(self.instruction_label)
         
         # Create the correction button
-        self.correct_button = QPushButton("Corrigir", self)
+        self.correct_button = QPushButton("Corrigir", self.side_panel)
         self.correct_button.clicked.connect(self._on_button_clicked)
         self.correct_button.setCursor(Qt.PointingHandCursor)
-        self.layout.addWidget(self.correct_button)
+        self.side_panel_layout.addWidget(self.correct_button)
         
         # Status message label
-        self.status_label = QLabel("", self)
+        self.status_label = QLabel("", self.side_panel)
         self.status_label.setAlignment(Qt.AlignCenter)
         self.status_label.setWordWrap(True)
         self.status_label.setStyleSheet("""
             font-size: 11px;
             color: #E0E0A0;
         """)
-        self.layout.addWidget(self.status_label)
+        self.side_panel_layout.addWidget(self.status_label)
         
-        # Create version label at the bottom right
-        self.version_label = QLabel("v1.0", self)
+        # Add spacer to push version label to bottom
+        self.side_panel_layout.addStretch(1)
+        
+        # Create version label at the bottom
+        self.version_label = QLabel("v1.0", self.side_panel)
         self.version_label.setAlignment(Qt.AlignRight | Qt.AlignBottom)
         self.version_label.setStyleSheet("""
             font-size: 10px;
             color: #5F5F70;
         """)
-        self.layout.addWidget(self.version_label)
+        self.side_panel_layout.addWidget(self.version_label)
+        
+        # Add side panel to main layout
+        self.layout.addWidget(self.side_panel)
+        
+        # Create content area for text displays
+        self.content_area = QWidget(self)
+        self.content_layout = QVBoxLayout(self.content_area)
+        self.content_layout.setContentsMargins(0, 0, 0, 0)
+        self.content_layout.setSpacing(15)
+        
+        # Create widgets for original text
+        self.original_text_label = QLabel("Texto para corrigir", self.content_area)
+        self.original_text_label.setStyleSheet("""
+            font-size: 16px;
+            font-weight: bold;
+            color: #E0E0E0;
+        """)
+        self.content_layout.addWidget(self.original_text_label)
+        
+        # Original text area
+        self.original_text_edit = QTextEdit(self.content_area)
+        self.original_text_edit.setReadOnly(True)
+        self.original_text_edit.setMinimumHeight(180)
+        self.content_layout.addWidget(self.original_text_edit)
+        
+        # Create widgets for corrected text
+        self.corrected_text_label = QLabel("Texto corrigido", self.content_area)
+        self.corrected_text_label.setStyleSheet("""
+            font-size: 16px;
+            font-weight: bold;
+            color: #E0E0E0;
+        """)
+        self.content_layout.addWidget(self.corrected_text_label)
+        
+        # Corrected text area
+        self.corrected_text_edit = QTextEdit(self.content_area)
+        self.corrected_text_edit.setReadOnly(True)
+        self.corrected_text_edit.setMinimumHeight(180)
+        self.content_layout.addWidget(self.corrected_text_edit)
+        
+        # Add content area to main layout
+        self.layout.addWidget(self.content_area, 1)
         
         # Create close button (X) in the top right corner
         self.close_button = QPushButton("✕", self)
@@ -173,6 +237,11 @@ class TextaGuiWindow(QWidget):
         
         logger.info("Correction button clicked. Hiding GUI and signaling workflow.")
         self._set_processing_state(True) # Disable button, set status
+        
+        # Clear text areas when starting new correction
+        self.original_text_edit.clear()
+        self.corrected_text_edit.clear()
+        
         self.hide() # Hide the GUI window to return focus
         QApplication.processEvents() # Ensure hide event is processed
         time.sleep(0.05) # Small delay to ensure focus shifts
@@ -193,14 +262,16 @@ class TextaGuiWindow(QWidget):
         
         # Update status message based on success (the message might have been set during error handling)
         if success and "Erro" not in self.status_label.text(): # Only overwrite if no error was explicitly set
-            self.set_status("Texto corrigido e colado!")
+            self.set_status("Texto corrigido!")
             QTimer.singleShot(2500, lambda: self.set_status("")) # Clear success message after 2.5s
         elif not success and not self.status_label.text(): # If workflow failed but no specific error was set
             self.set_status("Ocorreu um erro no fluxo.", error=True)
         # Error messages set previously via set_status will persist
 
+    @Slot(str, bool)
     def set_status(self, message, error=False):
         """Set the status message with optional error styling."""
+        logger.info(f"Definindo status: {message} (erro={error})")
         # Update status immediately if window is visible
         if self.isVisible():
             self.status_label.setText(message)
@@ -217,11 +288,29 @@ class TextaGuiWindow(QWidget):
                 """)
             # Make sure the message is immediately visible
             self.update()
-            QApplication.processEvents()
         else:
             # If window is hidden, just log the status
              log_level = logging.ERROR if error else logging.INFO
              logger.log(log_level, f"Status update (GUI hidden): {message}")
+
+    @Slot(str, str)
+    def set_text_content(self, original_text, corrected_text):
+        """Update the text areas with original and corrected text.
+        
+        Args:
+            original_text (str): The original, uncorrected text
+            corrected_text (str): The corrected text (can be empty)
+        """
+        logger.info("Atualizando conteúdo de texto na GUI")
+        self.original_text = original_text
+        self.corrected_text = corrected_text
+        
+        # Update UI text areas
+        self.original_text_edit.setText(original_text)
+        self.corrected_text_edit.setText(corrected_text)
+        
+        # Update the display
+        self.update()
 
     def _set_processing_state(self, is_processing):
         """Update the UI to reflect the processing state."""
@@ -244,8 +333,6 @@ class TextaGuiWindow(QWidget):
             self.correct_button.setText("Corrigir")
             self.correct_button.setEnabled(True)
             self.correct_button.setStyleSheet("")  # Reset to default style
-            # Status is now set explicitly in reset_state or during error handling
-            # self.set_status("Corrigindo texto...") 
     
     def mousePressEvent(self, event):
         """Handle mouse press events for window dragging."""

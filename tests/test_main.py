@@ -558,4 +558,111 @@ def test_keyboard_manager(mocker):
     # Testar parada do listener
     manager.stop()
     mock_global_hotkeys.return_value.stop.assert_called_once()
-    mock_global_hotkeys.return_value.join.assert_called_once() 
+    mock_global_hotkeys.return_value.join.assert_called_once()
+
+
+def test_workflow_manager_with_gui_integration(mocker):
+    """Testa a integração entre WorkflowManager e a GUI com sinais e slots."""
+    # Mock das funções principais
+    mock_capture = mocker.patch('src.main.capture_selected_text')
+    mock_correction = mocker.patch('src.main.get_corrected_text')
+    mock_paste = mocker.patch('src.main.paste_text')
+    
+    # Mock de funções auxiliares
+    mock_pyperclip_paste = mocker.patch('pyperclip.paste')
+    mock_pyperclip_copy = mocker.patch('pyperclip.copy')
+    mock_time_sleep = mocker.patch('time.sleep')
+    mock_logger = mocker.patch('src.main.logger')
+    
+    # Configuração dos valores de retorno
+    original_clipboard = "conteúdo original do clipboard"
+    selected_text = "texto selecionado para corrigir"
+    corrected_text = "texto corrigido pela LLM"
+    
+    mock_pyperclip_paste.return_value = original_clipboard
+    mock_capture.return_value = selected_text
+    mock_correction.return_value = corrected_text
+    
+    # Criar instância do WorkflowManager com mocks da animation_window e gui_window
+    mock_animation_window = MagicMock()
+    mock_gui_window = MagicMock()
+    
+    # Criar o manager com os mocks
+    manager = WorkflowManager(mock_animation_window, mock_gui_window)
+    
+    # Substituir os sinais por mocks para poder rastrear as emissões
+    manager.update_text_display = MagicMock()
+    manager.update_status = MagicMock()
+    manager.workflow_complete = MagicMock()
+    manager.request_start_animation = MagicMock()
+    manager.request_close_animation = MagicMock()
+    
+    # Mock o método release do lock para evitar a exceção
+    manager._lock = MagicMock()
+    
+    # Executar o método diretamente
+    manager._execute_workflow()
+    
+    # Verificações básicas do fluxo
+    mock_capture.assert_called_once()
+    mock_correction.assert_called_once_with(selected_text, api_key=mocker.ANY)
+    mock_paste.assert_called_once_with(corrected_text)
+    
+    # Verificações específicas da integração com a GUI
+    # 1. Verificar que o update_text_display foi emitido corretamente
+    assert manager.update_text_display.emit.call_count >= 2
+    # Com texto original após captura
+    manager.update_text_display.emit.assert_any_call(selected_text, "")
+    # Com texto original e corrigido após correção
+    manager.update_text_display.emit.assert_any_call(selected_text, corrected_text)
+    
+    # 2. Verificar que o workflow_complete foi emitido para atualizar a GUI
+    manager.workflow_complete.emit.assert_called_once_with(True)
+    
+
+def test_workflow_manager_gui_error_handling(mocker):
+    """Testa o tratamento de erros na integração do WorkflowManager com a GUI."""
+    # Mock das funções principais
+    mock_capture = mocker.patch('src.main.capture_selected_text')
+    mock_correction = mocker.patch('src.main.get_corrected_text')
+    mock_paste = mocker.patch('src.main.paste_text')
+    mock_print = mocker.patch('builtins.print')
+    
+    # Mock de funções auxiliares
+    mock_pyperclip_paste = mocker.patch('pyperclip.paste')
+    mock_pyperclip_copy = mocker.patch('pyperclip.copy')
+    
+    # Configuração para simular falha na captura
+    original_clipboard = "conteúdo original do clipboard"
+    mock_pyperclip_paste.return_value = original_clipboard
+    mock_capture.return_value = None  # Simula falha na captura
+    
+    # Criar instância do WorkflowManager com mocks
+    mock_animation_window = MagicMock()
+    mock_gui_window = MagicMock()
+    
+    # Criar o manager com os mocks
+    manager = WorkflowManager(mock_animation_window, mock_gui_window)
+    
+    # Substituir os sinais por mocks para poder rastrear as emissões
+    manager.update_text_display = MagicMock()
+    manager.update_status = MagicMock()
+    manager.workflow_complete = MagicMock()
+    manager.request_start_animation = MagicMock()
+    manager.request_close_animation = MagicMock()
+    
+    # Mock o método release do lock
+    manager._lock = MagicMock()
+    
+    # Executar o fluxo de workflow
+    manager._execute_workflow()
+    
+    # Verificações de tratamento de erro
+    # 1. Verificar que o sinal de status de erro foi emitido
+    manager.update_status.emit.assert_called_once()
+    error_args = manager.update_status.emit.call_args[0]
+    assert "Nenhum texto foi detectado" in error_args[0]
+    assert error_args[1] is True  # error=True
+    
+    # 2. Verificar que o workflow_complete é chamado com False para indicar falha
+    manager.workflow_complete.emit.assert_called_once_with(False) 

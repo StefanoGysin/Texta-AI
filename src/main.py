@@ -92,6 +92,10 @@ class WorkflowManager(QObject):
     request_close_animation = Signal()
     # Sinal para indicar que o fluxo terminou (bool indica sucesso)
     workflow_complete = Signal(bool)
+    # Sinal para atualizar os textos na GUI (original, corrigido)
+    update_text_display = Signal(str, str)
+    # Sinal para atualizar o status na GUI (mensagem, é_erro)
+    update_status = Signal(str, bool)
 
     def __init__(self, animation_window, gui_window=None):
         super().__init__()
@@ -103,6 +107,11 @@ class WorkflowManager(QObject):
         # Assegura que os slots serão executados na thread da animation_window (GUI thread)
         self.request_start_animation.connect(self.animation_window.start_effect, Qt.QueuedConnection)
         self.request_close_animation.connect(self.animation_window.force_close, Qt.QueuedConnection)
+        
+        # Conecta os sinais aos slots da GUI (se existir)
+        if self.gui_window:
+            self.update_text_display.connect(self.gui_window.set_text_content, Qt.QueuedConnection)
+            self.update_status.connect(self.gui_window.set_status, Qt.QueuedConnection)
 
     @Slot()
     def run_main_workflow(self):
@@ -150,7 +159,7 @@ class WorkflowManager(QObject):
                 error_occurred = True
                 error_message = "Erro ao capturar o texto selecionado."
                 print(error_message + " Verifique se há texto selecionado e tente novamente.")
-                if self.gui_window: self.gui_window.set_status(error_message, error=True)
+                if self.gui_window: self.update_status.emit(error_message, True)
                 return # Sai da thread do workflow
             
             if not selected_text:
@@ -158,10 +167,14 @@ class WorkflowManager(QObject):
                 error_occurred = True
                 error_message = "Nenhum texto foi detectado."
                 print(error_message + " Certifique-se de que o texto está selecionado...")
-                if self.gui_window: self.gui_window.set_status(error_message, error=True)
+                if self.gui_window: self.update_status.emit(error_message, True)
                 return # Sai da thread do workflow
 
             logger.info(f"Texto capturado: '{selected_text[:70]}...'")
+            
+            # Atualiza a GUI com o texto original capturado - usando sinal
+            if self.gui_window:
+                self.update_text_display.emit(selected_text, "")
             
             # 3. Correção (Bloqueante nesta thread)
             logger.info("Etapa 2: Correção do Texto (Chamando Agente OpenAI)")
@@ -171,6 +184,10 @@ class WorkflowManager(QObject):
                      raise ValueError("Falha ao obter texto corrigido da LLM (retorno vazio).")
                 logger.info(f"Texto corrigido: '{corrected_text[:70]}...'")
                 logger.info("Correção concluída com sucesso.")
+                
+                # Atualiza a GUI com o texto corrigido - usando sinal
+                if self.gui_window:
+                    self.update_text_display.emit(selected_text, corrected_text)
                 
             except (ConnectionError, TimeoutError, AuthenticationError, RateLimitError, ServiceUnavailableError, OpenAIError, ValueError) as e:
                 logger.error(f"Erro durante a correção: {e}", exc_info=True)
@@ -184,14 +201,14 @@ class WorkflowManager(QObject):
                 elif isinstance(e, ValueError): error_message = "Erro: Falha ao obter correção da IA."
                 else: error_message = "Erro na API OpenAI."
                 print(error_message)
-                if self.gui_window: self.gui_window.set_status(error_message, error=True)
+                if self.gui_window: self.update_status.emit(error_message, True)
                 return # Sai da thread do workflow
             except Exception as e:
                  logger.exception(f"Erro inesperado durante a correção: {e}")
                  error_occurred = True
                  error_message = "Erro inesperado na correção."
                  print(error_message)
-                 if self.gui_window: self.gui_window.set_status(error_message, error=True)
+                 if self.gui_window: self.update_status.emit(error_message, True)
                  return # Sai da thread do workflow
 
             # Se chegamos aqui, a correção foi bem-sucedida
@@ -206,7 +223,7 @@ class WorkflowManager(QObject):
                 error_occurred = True
                 error_message = "Erro ao colar o texto."
                 print(error_message + " O texto foi corrigido mas não pôde ser colado.")
-                if self.gui_window: self.gui_window.set_status(error_message, error=True)
+                if self.gui_window: self.update_status.emit(error_message, True)
                 # Não retornamos aqui, pois ainda precisamos fechar a animação e restaurar o clipboard
 
         except Exception as e:
@@ -214,7 +231,7 @@ class WorkflowManager(QObject):
             error_occurred = True
             error_message = "Erro inesperado no processamento."
             print(error_message)
-            if self.gui_window: self.gui_window.set_status(error_message, error=True)
+            if self.gui_window: self.update_status.emit(error_message, True)
         finally:
             # Garante que a animação feche, caso ainda não tenha sido fechada
             if animation_started:
