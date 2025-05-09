@@ -1,8 +1,8 @@
-# Texta AI
+# 🤖 Texta AI
 
 Um assistente de texto inteligente que funciona em segundo plano, ativado por um atalho de teclado, com feedback visual moderno.
 
-## Sobre o Projeto
+## 📖 Sobre o Projeto
 
 O Texta AI é uma ferramenta de produtividade que:
 
@@ -14,7 +14,7 @@ O Texta AI é uma ferramenta de produtividade que:
 
 A ferramenta funciona em qualquer aplicativo onde você possa selecionar e colar texto, tornando o processo de correção de texto mais rápido e eficiente.
 
-### Características
+### ✨ Características
 
 - **Interface Visual Moderna**: Animação minimalista com efeitos de pulso, gradientes e partículas
 - **Feedback em Tempo Real**: A animação segue o cursor e indica o status do processamento
@@ -23,45 +23,79 @@ A ferramenta funciona em qualquer aplicativo onde você possa selecionar e colar
 - **Configurável**: Tecla de atalho e prompt de correção personalizáveis
 - **Logging Detalhado**: Sistema completo de logs para console e arquivo
 
-## Requisitos
+## 🛠️ Requisitos
 
 - Python 3.9 ou superior
 - Chave de API da OpenAI
 - Bibliotecas Python (instaladas automaticamente pelo `pip`)
 - Sistema operacional: Windows (testado no Windows 10)
 
-## Instalação
+## 📥 Instalação
 
-1. Clone este repositório:
-   ```
+1. **Clone o Repositório**
+   ```bash
    git clone https://github.com/seu-usuario/texta-ai.git
    cd texta-ai
    ```
 
-2. Crie e ative um ambiente virtual (recomendado):
-   ```
+2. **Configure o Ambiente Virtual**
+   
+   É altamente recomendado usar um ambiente virtual para isolar as dependências do projeto.
+
+   No Windows:
+   ```bash
+   # Criar ambiente virtual
    python -m venv .venv
-   .venv\Scripts\activate  # Windows
-   source .venv/bin/activate  # Linux/Mac
+   
+   # Ativar ambiente virtual
+   .venv\Scripts\activate
    ```
 
-3. Instale as dependências:
+   No Linux/Mac:
+   ```bash
+   # Criar ambiente virtual
+   python -m venv .venv
+   
+   # Ativar ambiente virtual
+   source .venv/bin/activate
    ```
+
+3. **Instale as Dependências**
+   ```bash
+   # Atualizar pip para a última versão
+   python -m pip install --upgrade pip
+   
+   # Instalar dependências do projeto
    pip install -r requirements.txt
    ```
 
-4. Configure o arquivo `.env`:
-   ```
-   # Crie um arquivo .env na raiz do projeto com o seguinte conteúdo:
+4. **Configure o Arquivo .env**
+   
+   Crie um arquivo `.env` na raiz do projeto com as seguintes configurações:
+   ```env
+   # Sua chave de API da OpenAI (obrigatória)
    OPENAI_API_KEY=sua_chave_api_aqui
-   HOTKEY=ctrl+alt+c  # Você pode alterar para outra combinação se preferir
+   
+   # Tecla de atalho (opcional, padrão: ctrl+alt+c)
+   HOTKEY=ctrl+alt+c
+   
+   # Prompt de correção (opcional)
    CORRECTION_PROMPT=Você é um assistente especialista em correção de texto em português brasileiro. Sua tarefa é corrigir a gramática, ortografia e pontuação do texto fornecido. Mantenha o significado original e o tom/estilo do texto o máximo possível. Responda APENAS com o texto corrigido, sem adicionar introduções, saudações, despedidas, explicações ou comentários adicionais. Se o texto de entrada já estiver correto, retorne o texto original sem modificações. Texto a ser corrigido:
    ```
 
-## Uso
+5. **Verificação da Instalação**
+   ```bash
+   # Verifique se o Python está correto
+   python --version  # Deve mostrar 3.9 ou superior
+   
+   # Verifique se as dependências foram instaladas
+   pip list  # Deve mostrar todas as bibliotecas necessárias
+   ```
+
+## 🚀 Uso
 
 1. Execute o programa:
-   ```
+   ```bash
    python src/main.py
    ```
 
@@ -75,7 +109,7 @@ A ferramenta funciona em qualquer aplicativo onde você possa selecionar e colar
 
 4. Para encerrar o programa, pressione `Ctrl+C` no terminal onde o programa está sendo executado.
 
-## Configuração
+## ⚙️ Configuração
 
 Você pode personalizar as seguintes configurações no arquivo `.env`:
 
@@ -83,7 +117,7 @@ Você pode personalizar as seguintes configurações no arquivo `.env`:
 - `HOTKEY`: A tecla de atalho para ativar a correção (padrão: `ctrl+alt+c`)
 - `CORRECTION_PROMPT`: O prompt que será enviado para a LLM junto com o texto a ser corrigido
 
-## Sistema de Logging
+## 📝 Sistema de Logging
 
 A aplicação mantém registros detalhados da execução:
 
@@ -93,7 +127,7 @@ A aplicação mantém registros detalhados da execução:
 - O formato dos logs inclui timestamp, nome do módulo, nível e mensagem
 - A pasta `logs` é criada automaticamente na primeira execução
 
-## Tratamento de Erros
+## ❌ Tratamento de Erros
 
 O Texta AI inclui um sistema robusto de tratamento de erros:
 
@@ -107,7 +141,7 @@ O Texta AI inclui um sistema robusto de tratamento de erros:
   - Limites de taxa (rate limits)
   - Indisponibilidade do serviço
 
-## Solução de Problemas
+## 🔍 Solução de Problemas
 
 Se a ferramenta não estiver funcionando como esperado:
 
@@ -118,14 +152,14 @@ Se a ferramenta não estiver funcionando como esperado:
 5. Em caso de erros de rede, a aplicação tentará automaticamente algumas vezes antes de desistir
 6. Se a animação visual não aparecer, verifique se sua placa gráfica suporta aceleração de hardware
 
-## Status do Projeto
+## 📊 Status do Projeto
 
 - **Versão Atual**: 1.0.0
 - **Cobertura de Testes**: 87%
 - **Testes Unitários**: 33 testes implementados e passando
 - **Estado**: Estável, em fase de testes de confiabilidade
 
-## Executando os Testes
+## 🧪 Executando os Testes
 
 Para executar os testes unitários e verificar a cobertura de código:
 
@@ -145,10 +179,10 @@ pytest -v tests/
 
 O relatório de cobertura mostrará a porcentagem de código coberto por testes para cada módulo em `src/`.
 
-## Licença
+## 📄 Licença
 
 Este projeto é licenciado sob a Licença MIT - veja o arquivo LICENSE para detalhes.
 
-## Contribuição
+## 👥 Contribuição
 
 Contribuições são bem-vindas! Sinta-se à vontade para abrir issues e pull requests. 
