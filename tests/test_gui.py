@@ -3,6 +3,7 @@ from unittest.mock import MagicMock, patch
 from PySide6.QtCore import Qt, Signal, Slot, QTimer
 from PySide6.QtWidgets import QApplication
 import sys
+import os
 
 # Importando os componentes a serem testados
 from src.gui import TextaGuiWindow
@@ -240,3 +241,95 @@ def test_workflow_manager_error_handling_signals(mocker):
         error_call_args = manager.update_status.emit.call_args[0]
         assert "Erro" in error_call_args[0]
         assert error_call_args[1] is True  # error=True 
+
+
+def test_app_icon_setup(gui_window, mocker):
+    """Testa a configuração do ícone do aplicativo com logo existente."""
+    # Criar um caminho de logo de teste
+    test_resources_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'src', 'resources', 'images')
+    test_logo_path = os.path.join(test_resources_dir, 'logo.png')
+    
+    # Mock para verificar se o arquivo existe
+    mock_exists = mocker.patch('os.path.exists', return_value=True)
+    # Mock para QIcon para evitar operações reais com arquivos
+    mock_icon = MagicMock()
+    mock_qicon = mocker.patch('src.gui.QIcon', return_value=mock_icon)
+    # Mock para setWindowIcon
+    mock_set_icon = mocker.patch.object(gui_window, 'setWindowIcon')
+    # Mock para QApplication.instance()
+    mock_app_instance = MagicMock()
+    mock_qapp = mocker.patch('src.gui.QApplication.instance', return_value=mock_app_instance)
+    
+    # Chamar o método de configuração do ícone
+    gui_window._set_app_icon()
+    
+    # Verificar se os métodos corretos foram chamados
+    mock_exists.assert_called_with(test_logo_path)
+    mock_qicon.assert_called_once_with(test_logo_path)
+    # Verificar se o ícone foi definido para a janela
+    mock_set_icon.assert_called_once_with(mock_icon)
+    # Verificar se tentou definir o ícone para toda a aplicação
+    mock_app_instance.setWindowIcon.assert_called_once_with(mock_icon)
+
+
+def test_app_icon_setup_no_logo(gui_window, mocker):
+    """Testa o comportamento quando o arquivo de logo não existe."""
+    # Mock para verificar se o arquivo existe (retornando False)
+    mock_exists = mocker.patch('os.path.exists', return_value=False)
+    # Mock para QIcon para evitar operações reais com arquivos
+    mock_qicon = mocker.patch('src.gui.QIcon')
+    # Mock para setWindowIcon
+    mock_set_icon = mocker.patch.object(gui_window, 'setWindowIcon')
+    
+    # Chamar o método de configuração do ícone
+    gui_window._set_app_icon()
+    
+    # Verificar que QIcon não foi chamado
+    mock_qicon.assert_not_called()
+    # Verificar que setWindowIcon não foi chamado
+    mock_set_icon.assert_not_called()
+    # Verificar que app_icon foi definido como None
+    assert gui_window.app_icon is None
+
+
+def test_gui_logo_in_header(mocker, app):
+    """Testa a exibição do logo no cabeçalho da GUI quando existe."""
+    # Precisamos criar uma nova instância do widget com os mocks prontos antes da inicialização
+    # Mock para verificar se o arquivo existe (antes de criar o widget)
+    mock_exists = mocker.patch('os.path.exists', return_value=True)
+    # Mock para QPixmap e scaled
+    mock_scaled = MagicMock()
+    mock_pixmap = MagicMock()
+    mock_pixmap.scaled.return_value = mock_scaled
+    mock_qpixmap = mocker.patch('src.gui.QPixmap', return_value=mock_pixmap)
+    # Mock para o método setPixmap
+    with patch('PySide6.QtWidgets.QLabel.setPixmap') as mock_set_pixmap:
+        # Criar uma instância com os mocks já configurados
+        gui_window = TextaGuiWindow()
+        
+        # Verificações
+        mock_exists.assert_called()
+        mock_qpixmap.assert_called()
+        # Verificar que o pixmap foi escalado com os parâmetros corretos
+        mock_pixmap.scaled.assert_called_with(40, 40, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+        # Verificar que setPixmap foi chamado com o pixmap escalado
+        assert mock_set_pixmap.called
+
+
+def test_gui_logo_fallback(mocker, app):
+    """Testa o fallback para emoji quando o logo não está disponível."""
+    # Precisamos criar uma nova instância com mocks prontos
+    # Mock para verificar se o arquivo existe (retornando False)
+    mock_exists = mocker.patch('os.path.exists', return_value=False)
+    # Mock para QPixmap
+    mock_qpixmap = mocker.patch('src.gui.QPixmap')
+    # Mock para setText
+    with patch('PySide6.QtWidgets.QLabel.setText') as mock_set_text:
+        # Criar instância depois dos mocks
+        gui_window = TextaGuiWindow()
+        
+        # Verificações
+        mock_exists.assert_called()
+        mock_qpixmap.assert_not_called()
+        # Verificar que setText foi chamado com o emoji
+        mock_set_text.assert_any_call("🤖") 

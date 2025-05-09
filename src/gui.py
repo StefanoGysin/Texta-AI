@@ -1,11 +1,12 @@
 import logging
 import pyperclip
 import time
+import os
 from functools import partial
 
 from PySide6.QtWidgets import QWidget, QPushButton, QVBoxLayout, QLabel, QApplication, QFrame, QHBoxLayout, QScrollArea, QTextEdit
 from PySide6.QtCore import Qt, Signal, Slot, QSize, QTimer, QPoint
-from PySide6.QtGui import QColor, QPalette, QFont, QIcon, QCursor, QLinearGradient, QBrush
+from PySide6.QtGui import QColor, QPalette, QFont, QIcon, QCursor, QLinearGradient, QBrush, QPixmap
 
 from src.capture import capture_selected_text
 from src.correction import get_corrected_text
@@ -31,6 +32,9 @@ class TextaGuiWindow(QWidget):
         
         self.setWindowTitle("Texta AI")
         self.setWindowFlags(Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint)
+        
+        # Configurar ícone da aplicação se disponível
+        self._set_app_icon()
         
         # Enable custom styling
         self.setStyleSheet("""
@@ -89,6 +93,24 @@ class TextaGuiWindow(QWidget):
         
         logger.info("TextaGuiWindow initialized.")
 
+    def _set_app_icon(self):
+        """Configura o ícone da aplicação a partir de resources."""
+        # Verificar se o diretório de recursos existe
+        resources_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'src', 'resources', 'images')
+        logo_path = os.path.join(resources_dir, 'logo.png')
+        
+        # Verificar se o arquivo de logo existe
+        if os.path.exists(logo_path):
+            logger.info(f"Usando logo em: {logo_path}")
+            self.app_icon = QIcon(logo_path)
+            self.setWindowIcon(self.app_icon)
+            # Também definir como ícone para toda a aplicação
+            if QApplication.instance():
+                QApplication.instance().setWindowIcon(self.app_icon)
+        else:
+            logger.warning(f"Logo não encontrado em: {logo_path}")
+            self.app_icon = None
+
     def _init_ui(self):
         """Initialize user interface components."""
         # Create main layout
@@ -103,6 +125,26 @@ class TextaGuiWindow(QWidget):
         self.side_panel_layout.setContentsMargins(10, 10, 10, 10)
         self.side_panel_layout.setSpacing(10)
         
+        # Adicionar layout para o logo e título
+        self.header_layout = QHBoxLayout()
+        
+        # Adicionar logo (se disponível)
+        self.logo_label = QLabel(self.side_panel)
+        self.logo_label.setFixedSize(40, 40)
+        resources_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'src', 'resources', 'images')
+        logo_path = os.path.join(resources_dir, 'logo.png')
+        
+        if os.path.exists(logo_path):
+            logo_pixmap = QPixmap(logo_path)
+            self.logo_label.setPixmap(logo_pixmap.scaled(40, 40, Qt.KeepAspectRatio, Qt.SmoothTransformation))
+            logger.info(f"Logo carregado da imagem em: {logo_path}")
+        else:
+            self.logo_label.setText("🤖")
+            self.logo_label.setStyleSheet("font-size: 24px; color: #428BFA;")
+            logger.warning(f"Logo não encontrado, usando emoji padrão")
+        
+        self.header_layout.addWidget(self.logo_label)
+        
         # Create title label
         self.title_label = QLabel("Texta AI", self.side_panel)
         self.title_label.setAlignment(Qt.AlignCenter)
@@ -111,7 +153,10 @@ class TextaGuiWindow(QWidget):
             font-weight: bold;
             color: #C0C0E0;
         """)
-        self.side_panel_layout.addWidget(self.title_label)
+        self.header_layout.addWidget(self.title_label)
+        
+        # Adicionar header ao layout principal
+        self.side_panel_layout.addLayout(self.header_layout)
         
         # Add instruction label
         self.instruction_label = QLabel("Selecione texto em outro aplicativo\nantes de clicar em Corrigir", self.side_panel)
