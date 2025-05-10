@@ -1,14 +1,13 @@
 import sys
 import random
-import logging
 import time
 import math
+from .logger_config import logger
+import os
 
 from PySide6.QtWidgets import QApplication, QWidget
 from PySide6.QtGui import QPainter, QColor, QPen, QCursor, QRadialGradient, QBrush
 from PySide6.QtCore import Qt, QTimer, QPointF, Signal, Slot
-
-logger = logging.getLogger(__name__)
 
 class Particle:
     """Small particle for additional visual interest."""

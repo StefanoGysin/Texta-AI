@@ -1,7 +1,11 @@
-import logging
+import os
+import sys
+# Usar a configuração de logger centralizada
+from .logger_config import logger
+from pathlib import Path
+from typing import Callable, List, Optional
 import pyperclip
 import time
-import os
 from functools import partial
 
 from PySide6.QtWidgets import QWidget, QPushButton, QVBoxLayout, QLabel, QApplication, QFrame, QHBoxLayout, QScrollArea, QTextEdit, QGraphicsDropShadowEffect
@@ -13,7 +17,7 @@ from src.correction import get_corrected_text
 from src.paste import paste_text
 
 # Configuração de logging para o módulo
-logger = logging.getLogger(__name__)
+logger.info("Initializing TextaGuiWindow with enhanced styling...")
 
 class TextaGuiWindow(QWidget):
     """
@@ -185,7 +189,7 @@ class TextaGuiWindow(QWidget):
                 logger.warning("Could not load any Inter fonts from resources. System fallbacks will be used.")
 
         except Exception as e:
-            logger.warning(f"Error loading fonts: {e}", exc_info=True)
+            logger.warning(f"Error loading fonts: {e}")
 
     def _set_app_icon(self):
         """Configura o ícone da aplicação a partir de resources."""
@@ -366,8 +370,10 @@ class TextaGuiWindow(QWidget):
                 self.status_label.setStyleSheet("color: #A0FFA0; font-size: 12px; font-family: 'Inter', 'Segoe UI', Arial, sans-serif;") 
             self.update()
         else:
-            log_level = logging.ERROR if error else logging.INFO
-            logger.log(log_level, f"Status (GUI hidden): {message}")
+            if error:
+                logger.error(f"Status (GUI hidden): {message}")
+            else:
+                logger.info(f"Status (GUI hidden): {message}")
 
     @Slot(str, str)
     def set_text_content(self, original_text, corrected_text):
@@ -475,4 +481,4 @@ class TextaGuiWindow(QWidget):
                     self.corrected_text_edit.repaint()
                 logger.info("Window shown and activated.")
         except Exception as e:
-            logger.error(f"Error in toggle_visibility: {e}", exc_info=True) 
+            logger.error(f"Error in toggle_visibility: {e}") 

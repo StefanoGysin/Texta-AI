@@ -4,10 +4,8 @@ import pyperclip
 import time
 import platform
 import pyautogui
-import logging
-
-# Configuração de logging para o módulo
-logger = logging.getLogger(__name__)
+# Usar a configuração de logger centralizada
+from .logger_config import logger
 
 def paste_text(text_to_paste: str, paste_hotkey: str = 'ctrl+v', delay: float = 0.3):
     """Coloca o texto na área de transferência e simula a colagem.
@@ -41,8 +39,10 @@ def paste_text(text_to_paste: str, paste_hotkey: str = 'ctrl+v', delay: float = 
         # Pequena pausa para garantir que a colagem foi processada
         time.sleep(0.1)  # Mantemos 0.1s, é crítico para aplicações processarem a colagem
 
+        return True
     except Exception as e:
-        logger.error(f"Erro ao colar texto: {e}", exc_info=True)
+        logger.error(f"Erro ao colar texto: {e}")
+        return False
 
 # --- Bloco de Teste Local (opcional) ---
 # if __name__ == '__main__':

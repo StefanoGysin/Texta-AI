@@ -1,13 +1,11 @@
-import logging
-import threading
 import time
-from typing import Callable, Dict, Optional, Set, Tuple
-from pynput import keyboard
-from pynput.keyboard import Key, KeyCode, GlobalHotKeys
+from threading import Thread
+from typing import Callable, Dict, Any
+from pynput.keyboard import GlobalHotKeys
+# Usar a configuração de logger centralizada
+from .logger_config import logger
 
-# Configuração de logging
-logger = logging.getLogger(__name__)
-
+# Classe principal para gerenciar atalhos de teclado globais
 class KeyboardManager:
     """
     Gerenciador de listeners de teclado usando pynput.keyboard.GlobalHotKeys para suporte 
@@ -46,7 +44,7 @@ class KeyboardManager:
             logger.info(f"Hotkey '{hotkey}' registrada com sucesso para o callback {callback.__name__}.")
             return True
         except Exception as e:
-            logger.error(f"Erro ao registrar hotkey '{hotkey}': {e}", exc_info=True)
+            logger.error(f"Erro ao registrar hotkey '{hotkey}': {e}")
             return False
     
     def _format_hotkey_string(self, hotkey: str) -> str:
@@ -89,7 +87,7 @@ class KeyboardManager:
                 return False
                 
         except Exception as e:
-            logger.error(f"Erro ao remover hotkey '{hotkey}': {e}", exc_info=True)
+            logger.error(f"Erro ao remover hotkey '{hotkey}': {e}")
             return False
             
     def start(self, block: bool = False):
@@ -124,7 +122,7 @@ class KeyboardManager:
                 
         except Exception as e:
             self.running = False
-            logger.error(f"Erro crítico ao iniciar keyboard manager: {e}", exc_info=True)
+            logger.error(f"Erro crítico ao iniciar keyboard manager: {e}")
             # Opcionalmente, podemos relançar a exceção
             # raise e
             
@@ -148,11 +146,10 @@ class KeyboardManager:
                 
             logger.info("Keyboard manager parado com sucesso.")
         except Exception as e:
-            logger.error(f"Erro ao parar keyboard manager: {e}", exc_info=True)
+            logger.error(f"Erro ao parar keyboard manager: {e}")
 
 # Exemplo de uso básico (para teste local se necessário)
 if __name__ == '__main__':
-    logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
     logger.info("Testando KeyboardManager...")
 
     def my_callback_1():

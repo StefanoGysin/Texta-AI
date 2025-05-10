@@ -1,12 +1,10 @@
 import os
 import asyncio
-import logging
+# Importar o logger pré-configurado
+from .logger_config import logger
 import time
 from dotenv import load_dotenv
 from agents import Agent, Runner, ModelSettings
-
-# Configuração de logging para o módulo
-logger = logging.getLogger(__name__)
 
 # Carrega variáveis de ambiente do arquivo .env
 load_dotenv()
@@ -131,7 +129,7 @@ async def _run_correction_async(text_to_correct: str) -> str | None:
                     
             else:
                 # Erro genérico, não tentamos novamente
-                logger.error(f"Erro desconhecido ao executar o agente de correção: {e}", exc_info=True)
+                logger.error(f"Erro desconhecido ao executar o agente de correção: {e}")
                 return None
     
     # Se chegamos aqui, esgotamos as tentativas
@@ -183,7 +181,7 @@ def get_corrected_text(text_to_correct: str, api_key=None) -> str | None:
             logger.error("A correção falhou após várias tentativas ou devido a erro crítico.")
             return None
     except Exception as e:
-        logger.error(f"Erro não tratado durante a correção: {e}", exc_info=True)
+        logger.error(f"Erro não tratado durante a correção: {e}")
         return None
     finally:
         # Restaura a API key original se foi alterada

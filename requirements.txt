@@ -6,6 +6,7 @@ python-dotenv
 pyautogui
 PySide6
 pynput>=1.7.6 # Versão mínima requerida para GlobalHotKeys
+loguru # Para logging aprimorado
 
 # Test dependencies
 pytest

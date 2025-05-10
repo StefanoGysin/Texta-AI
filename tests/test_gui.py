@@ -553,20 +553,21 @@ def test_set_status_when_window_hidden(gui_window, mocker):
     # Mock para isVisible retornando False (janela oculta)
     mocker.patch.object(gui_window, 'isVisible', return_value=False)
     
-    # Mock para logger.log em vez de logger.info e logger.error diretamente
-    mock_logger_log = mocker.patch('src.gui.logger.log')
+    # Mock para logger.info e logger.error em vez de logger.log
+    mock_logger_info = mocker.patch('src.gui.logger.info')
+    mock_logger_error = mocker.patch('src.gui.logger.error')
     
     # Testes com mensagem normal (não erro)
     gui_window.set_status("Mensagem de teste")
     
-    # Verificar se logger.log foi chamado com o nível INFO
-    mock_logger_log.assert_any_call(mocker.ANY, "Status (GUI hidden): Mensagem de teste")
+    # Verificar se logger.info foi chamado
+    mock_logger_info.assert_any_call("Status (GUI hidden): Mensagem de teste")
     
     # Agora com uma mensagem de erro
     gui_window.set_status("Erro de teste", error=True)
     
-    # Verificar se logger.log foi chamado novamente, desta vez para o erro
-    mock_logger_log.assert_any_call(mocker.ANY, "Status (GUI hidden): Erro de teste")
+    # Verificar se logger.error foi chamado
+    mock_logger_error.assert_any_call("Status (GUI hidden): Erro de teste")
 
 
 def test_toggle_visibility_hide(gui_window, mocker):

@@ -6,7 +6,6 @@ os.environ["QT_LOGGING_RULES"] = "*.debug=false;qt.qpa.*=false"  # Suprime mensa
 # Alternativa que também podemos tentar:
 # os.environ["QT_SCALE_FACTOR_ROUNDING_POLICY"] = "PassThrough"
 
-import logging
 import sys
 import time
 import threading
@@ -21,6 +20,9 @@ if __name__ == "__main__":
     if ROOT_DIR not in sys.path:
         sys.path.insert(0, ROOT_DIR)
         print(f"Adicionado {ROOT_DIR} ao PYTHONPATH")
+
+# Agora que o PYTHONPATH está configurado, podemos importar o logger
+from src.logger_config import logger
 
 # Remover import keyboard
 # import keyboard 
@@ -41,25 +43,6 @@ from src.gui import TextaGuiWindow
 
 # Assegurar que a pasta logs existe
 os.makedirs('logs', exist_ok=True)
-
-# Configuração avançada de logging para console e arquivo
-# Criar handlers
-console_handler = logging.StreamHandler()
-file_handler = logging.FileHandler('logs/texta-ai.log')
-
-# Definir formato
-log_format = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-console_handler.setFormatter(log_format)
-file_handler.setFormatter(log_format)
-
-# Configurar o logger root
-root_logger = logging.getLogger()
-root_logger.setLevel(logging.INFO)
-root_logger.addHandler(console_handler)
-root_logger.addHandler(file_handler)
-
-# Logger específico para este módulo
-logger = logging.getLogger(__name__)
 
 # Carregar variáveis de ambiente do arquivo .env
 logger.info("Carregando variáveis de ambiente...")
@@ -155,7 +138,7 @@ class WorkflowManager(QObject):
             try:
                 selected_text = capture_selected_text()
             except Exception as e:
-                logger.error(f"Erro durante a captura de texto: {e}", exc_info=True)
+                logger.error(f"Erro durante a captura de texto: {e}")
                 error_occurred = True
                 error_message = "Erro ao capturar o texto selecionado."
                 print(error_message + " Verifique se há texto selecionado e tente novamente.")
@@ -190,7 +173,7 @@ class WorkflowManager(QObject):
                     self.update_text_display.emit(selected_text, corrected_text)
                 
             except (ConnectionError, TimeoutError, AuthenticationError, RateLimitError, ServiceUnavailableError, OpenAIError, ValueError) as e:
-                logger.error(f"Erro durante a correção: {e}", exc_info=True)
+                logger.error(f"Erro durante a correção: {e}")
                 error_occurred = True
                 # Definir mensagem de erro específica
                 if isinstance(e, ConnectionError): error_message = "Erro: Falha na conexão com OpenAI."
@@ -204,7 +187,7 @@ class WorkflowManager(QObject):
                 if self.gui_window: self.update_status.emit(error_message, True)
                 return # Sai da thread do workflow
             except Exception as e:
-                 logger.exception(f"Erro inesperado durante a correção: {e}")
+                 logger.error(f"Erro inesperado durante a correção: {e}")
                  error_occurred = True
                  error_message = "Erro inesperado na correção."
                  print(error_message)
@@ -219,7 +202,7 @@ class WorkflowManager(QObject):
                 paste_text(corrected_text)
                 logger.info("Texto corrigido colado com sucesso.")
             except Exception as e:
-                logger.error(f"Erro durante a colagem do texto: {e}", exc_info=True)
+                logger.error(f"Erro durante a colagem do texto: {e}")
                 error_occurred = True
                 error_message = "Erro ao colar o texto."
                 print(error_message + " O texto foi corrigido mas não pôde ser colado.")
@@ -227,7 +210,7 @@ class WorkflowManager(QObject):
                 # Não retornamos aqui, pois ainda precisamos fechar a animação e restaurar o clipboard
 
         except Exception as e:
-            logger.exception(f"Erro inesperado no workflow: {e}")
+            logger.error(f"Erro inesperado no workflow: {e}")
             error_occurred = True
             error_message = "Erro inesperado no processamento."
             print(error_message)
@@ -256,7 +239,7 @@ class WorkflowManager(QObject):
             pyperclip.copy(original_content)
             logger.debug("Conteúdo original do clipboard restaurado.")
         except Exception as e:
-            logger.error(f"Erro ao restaurar clipboard: {e}", exc_info=True)
+            logger.error(f"Erro ao restaurar clipboard: {e}")
             
     @Slot()
     def toggle_gui(self):

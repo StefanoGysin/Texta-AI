@@ -1,5 +1,5 @@
 import pytest
-import logging
+# Substituir importação direta do loguru por um mock
 import os
 import time
 import pyperclip
@@ -241,8 +241,8 @@ def test_workflow_manager_correction_exception(mocker):
     # Deve restaurar o clipboard original
     mock_pyperclip_copy.assert_called_with(original_clipboard)
     
-    # Deve ter logado a exceção
-    mock_logger.exception.assert_called_once()
+    # Deve ter logado a exceção com logger.error em vez de logger.exception
+    mock_logger.error.assert_called_once()
     
     # Verifica mensagem para o usuário
     user_message_calls = [call for call in mock_print.call_args_list if "erro inesperado" in str(call).lower()]

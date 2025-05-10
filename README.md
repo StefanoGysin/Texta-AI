@@ -119,13 +119,13 @@ Você pode personalizar as seguintes configurações no arquivo `.env`:
 
 ## 📝 Sistema de Logging
 
-A aplicação mantém registros detalhados da execução:
+A aplicação utiliza a biblioteca `Loguru` para um sistema de logging detalhado e configurável:
 
-- Os logs são exibidos no console durante a execução
-- Todos os logs também são salvos no arquivo `logs/texta-ai.log`
-- Diferentes níveis de log são utilizados (INFO, WARNING, ERROR, DEBUG)
-- O formato dos logs inclui timestamp, nome do módulo, nível e mensagem
-- A pasta `logs` é criada automaticamente na primeira execução
+- **Console Colorido:** Os logs exibidos no console são coloridos para fácil diferenciação de níveis (INFO, WARNING, ERROR) e módulos, com o formato: `[NÍVEL] MÓDULO: Mensagem`.
+- **Arquivo de Log:** Todos os logs também são salvos no arquivo `logs/texta-ai.log` com o formato `[NÍVEL] MÓDULO: Mensagem` (sem cores) e com rotação de arquivo configurada para 10MB.
+- **Níveis de Log:** Diferentes níveis de log são utilizados para granularidade (`DEBUG`, `INFO`, `WARNING`, `ERROR`, `CRITICAL`).
+- **Configuração Centralizada:** A configuração do logger é gerenciada em `src/logger_config.py`.
+- **Criação Automática de Pasta:** A pasta `logs/` é criada automaticamente se não existir.
 
 ## ❌ Tratamento de Erros
 

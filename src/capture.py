@@ -4,10 +4,11 @@ import pyperclip
 import time
 import platform
 import pyautogui
-import logging
+# Usar a configuração de logger centralizada
+from .logger_config import logger
 
-# Configuração de logging para o módulo
-logger = logging.getLogger(__name__)
+# Removida a configuração de logging específica para o módulo (não necessária com Loguru)
+# logger = logging.getLogger(__name__)
 
 def capture_selected_text(copy_hotkey: str = 'ctrl+c', delay: float = 0.3) -> str | None:
     """Simula a cópia do texto selecionado e lê da área de transferência.
@@ -77,13 +78,14 @@ def capture_selected_text(copy_hotkey: str = 'ctrl+c', delay: float = 0.3) -> st
             return None
 
     except Exception as e:
-        logger.error(f"Erro ao capturar texto da área de transferência: {e}", exc_info=True)
+        logger.error(f"Erro ao capturar texto da área de transferência: {e}")
+        # Note que o Loguru não precisa do parâmetro exc_info=True
         try:
             pyperclip.copy(original_clipboard_content)
         except NameError:
             pass 
         except Exception as restore_e:
-            logger.error(f"Erro ao restaurar área de transferência: {restore_e}", exc_info=True)
+            logger.error(f"Erro ao restaurar área de transferência: {restore_e}")
         return None
 
 # Código comentado abaixo: removido o uso de keyboard e substituído por alternativas adequadas
