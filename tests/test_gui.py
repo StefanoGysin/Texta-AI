@@ -1,6 +1,6 @@
 import pytest
 from unittest.mock import MagicMock, patch
-from PySide6.QtCore import Qt, Signal, Slot, QTimer
+from PySide6.QtCore import Qt, Signal, Slot, QTimer, QPoint
 from PySide6.QtWidgets import QApplication
 import sys
 import os
@@ -624,3 +624,173 @@ def test_button_click_while_processing(gui_window, mocker):
     
     # Alternativa: poderíamos modificar o código real para adicionar um log neste caso,
     # mas é melhor adaptar o teste para corresponder ao comportamento atual do código 
+
+def test_font_loading_no_fonts_found(mocker):
+    """Testa o comportamento quando nenhuma fonte é carregada com sucesso."""
+    # Simular que os arquivos existem
+    mock_exists = mocker.patch('os.path.exists', return_value=True)
+    
+    # Simular que addApplicationFont retorna um ID válido
+    mock_add_font = mocker.patch('PySide6.QtGui.QFontDatabase.addApplicationFont', return_value=0)
+    
+    # Simular que applicationFontFamilies retorna uma lista vazia (nenhuma família de fonte)
+    mock_families = mocker.patch('PySide6.QtGui.QFontDatabase.applicationFontFamilies', 
+                               return_value=[])
+    
+    # Mock para logger.info e logger.warning
+    mock_logger_info = mocker.patch('src.gui.logger.info')
+    mock_logger_warning = mocker.patch('src.gui.logger.warning')
+    
+    # Inicializar GUI
+    gui_window = TextaGuiWindow()
+    
+    # Verificar que warning foi emitido sobre "no families found"
+    assert any("but no families found" in call_args[0][0] 
+               for call_args in mock_logger_warning.call_args_list)
+    
+    # Verificar que não há log de sucesso para carregamento de fontes
+    assert not any("Successfully loaded" in call_args[0][0] 
+                  for call_args in mock_logger_info.call_args_list if "variant" in call_args[0][0])
+
+
+def test_mouse_press_event_for_dragging(gui_window, mocker):
+    """Testa o evento de pressionar o mouse para iniciar o arraste da janela."""
+    # Mock para super().mousePressEvent para evitar chamada real
+    mock_super = mocker.patch('PySide6.QtWidgets.QWidget.mousePressEvent')
+    
+    # Mock para a posição do evento
+    mock_event = MagicMock()
+    # Simular posição no cabeçalho (fora dos botões)
+    mock_position = MagicMock()
+    mock_position.y.return_value = 30  # Dentro da área de cabeçalho (<50px)
+    mock_position.x.return_value = 100  # Entre os botões
+    mock_event.position.return_value = mock_position
+    
+    # Simular botão esquerdo do mouse
+    mock_event.button.return_value = Qt.LeftButton
+    
+    # Configurar atributos de width (não são métodos, são propriedades)
+    mocker.patch.object(gui_window.settings_button, 'width', return_value=32)
+    mocker.patch.object(gui_window.close_button, 'width', return_value=32)
+    mocker.patch.object(gui_window, 'width', return_value=830)
+    
+    # Chamar o evento
+    gui_window.mousePressEvent(mock_event)
+    
+    # Verificar que o arraste foi ativado
+    assert gui_window.dragging is True
+    
+    # Verificar que a superclasse foi chamada
+    mock_super.assert_called_once_with(mock_event)
+
+
+def test_mouse_move_event_when_dragging(gui_window, mocker):
+    """Testa o evento de mover o mouse enquanto arrasta a janela."""
+    # Mock para super().mouseMoveEvent para evitar chamada real
+    mock_super = mocker.patch('PySide6.QtWidgets.QWidget.mouseMoveEvent')
+    
+    # Configurar o estado de arraste
+    gui_window.dragging = True
+    gui_window.offset = QPoint(10, 10)
+    
+    # Mock para o evento de movimento
+    mock_event = MagicMock()
+    mock_event.buttons.return_value = Qt.LeftButton
+    
+    # Mock para position
+    mock_position = MagicMock()
+    mock_position.toPoint.return_value = QPoint(100, 100)
+    mock_event.position.return_value = mock_position
+    
+    # Mock para mapToGlobal
+    mock_global_point = QPoint(200, 200)
+    mocker.patch.object(gui_window, 'mapToGlobal', return_value=mock_global_point)
+    
+    # Mock para move
+    mock_move = mocker.patch.object(gui_window, 'move')
+    
+    # Chamar o evento
+    gui_window.mouseMoveEvent(mock_event)
+    
+    # Verificar que move foi chamado
+    mock_move.assert_called_once()
+    
+    # Verificar que a superclasse foi chamada
+    mock_super.assert_called_once_with(mock_event)
+
+
+def test_mouse_release_event_to_stop_dragging(gui_window, mocker):
+    """Testa o evento de liberar o mouse para parar de arrastar a janela."""
+    # Mock para super().mouseReleaseEvent para evitar chamada real
+    mock_super = mocker.patch('PySide6.QtWidgets.QWidget.mouseReleaseEvent')
+    
+    # Configurar o estado inicial para arraste
+    gui_window.dragging = True
+    
+    # Mock para o evento
+    mock_event = MagicMock()
+    mock_event.button.return_value = Qt.LeftButton
+    
+    # Chamar o evento
+    gui_window.mouseReleaseEvent(mock_event)
+    
+    # Verificar que o arraste foi desativado
+    assert gui_window.dragging is False
+    
+    # Verificar que a superclasse foi chamada
+    mock_super.assert_called_once_with(mock_event)
+
+
+def test_set_processing_state_to_false(gui_window):
+    """Testa especificamente o comportamento de _set_processing_state quando is_processing=False."""
+    # Primeiro, configurar o estado para processando (True)
+    gui_window._set_processing_state(True)
+    assert gui_window.is_processing is True
+    assert gui_window.correct_button.text() == "Processando..."
+    
+    # Agora, testar a mudança para não processando (False) - deve atingir a linha 178
+    gui_window._set_processing_state(False)
+    
+    # Verificar se o estado foi atualizado corretamente
+    assert gui_window.is_processing is False
+    assert gui_window.correct_button.isEnabled() is True
+    assert gui_window.correct_button.text() == "Corrigir"  # Verifica a linha 178
+
+
+def test_font_loading_application_font_failure(mocker):
+    """Testa o caso específico onde QFontDatabase.addApplicationFont retorna -1 (falha)."""
+    # Simular que os arquivos existem
+    mock_exists = mocker.patch('os.path.exists', return_value=True)
+    
+    # Simular que o addApplicationFont retorna -1 (falha)
+    mock_add_font = mocker.patch('PySide6.QtGui.QFontDatabase.addApplicationFont', return_value=-1)
+    
+    # Mock para o logger.warning
+    mock_logger_warning = mocker.patch('src.gui.logger.warning')
+    
+    # Instanciar a janela (inicia o carregamento de fontes)
+    gui_window = TextaGuiWindow()
+    
+    # Verificar que a mensagem de warning específica da linha 178 foi chamada
+    assert any("Failed to load font" in call_args[0][0] and "addApplicationFont returned -1" in call_args[0][0]
+               for call_args in mock_logger_warning.call_args_list)
+
+
+def test_font_loading_all_failed(mocker):
+    """Testa o caso onde nenhuma fonte foi carregada com sucesso."""
+    # Simular que nenhuma fonte existe (path.exists retorna False)
+    mock_exists = mocker.patch('os.path.exists', return_value=False)
+    
+    # Mock para logger.warning
+    mock_logger_warning = mocker.patch('src.gui.logger.warning')
+    
+    # Inicializar GUI
+    gui_window = TextaGuiWindow()
+    
+    # Verificar que warning foi emitido sobre fontes não encontradas
+    assert any("Font file not found" in call_args[0][0] 
+               for call_args in mock_logger_warning.call_args_list)
+    
+    # Verificar que foi emitido o warning final de fallback
+    assert any("Could not load any Inter fonts" in call_args[0][0] 
+               for call_args in mock_logger_warning.call_args_list) 
