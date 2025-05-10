@@ -28,7 +28,7 @@ A ferramenta funciona em qualquer aplicativo onde você possa selecionar e colar
 - Python 3.9 ou superior
 - Chave de API da OpenAI
 - Bibliotecas Python (instaladas automaticamente pelo `pip`)
-- Sistema operacional: Windows (testado no Windows 10)
+- Sistema operacional: Windows (testado no Windows 11)
 
 ## 📥 Instalação
 
@@ -155,8 +155,8 @@ Se a ferramenta não estiver funcionando como esperado:
 ## 📊 Status do Projeto
 
 - **Versão Atual**: 1.0.0
-- **Cobertura de Testes**: 87%
-- **Testes Unitários**: 33 testes implementados e passando
+- **Cobertura de Testes**: 65%
+- **Testes Unitários**: 59 testes implementados e passando
 - **Estado**: Estável, em fase de testes de confiabilidade
 
 ## 🧪 Executando os Testes

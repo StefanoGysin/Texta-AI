@@ -4,9 +4,9 @@ import time
 import os
 from functools import partial
 
-from PySide6.QtWidgets import QWidget, QPushButton, QVBoxLayout, QLabel, QApplication, QFrame, QHBoxLayout, QScrollArea, QTextEdit
-from PySide6.QtCore import Qt, Signal, Slot, QSize, QTimer, QPoint
-from PySide6.QtGui import QColor, QPalette, QFont, QIcon, QCursor, QLinearGradient, QBrush, QPixmap
+from PySide6.QtWidgets import QWidget, QPushButton, QVBoxLayout, QLabel, QApplication, QFrame, QHBoxLayout, QScrollArea, QTextEdit, QGraphicsDropShadowEffect
+from PySide6.QtCore import Qt, Signal, Slot, QSize, QTimer, QPoint, QPropertyAnimation, QEasingCurve
+from PySide6.QtGui import QColor, QPalette, QFont, QIcon, QCursor, QLinearGradient, QBrush, QPixmap, QFontDatabase, QPainter, QRadialGradient, QPainterPath
 
 from src.capture import capture_selected_text
 from src.correction import get_corrected_text
@@ -28,364 +28,398 @@ class TextaGuiWindow(QWidget):
         Initialize the GUI window.
         """
         super().__init__(parent)
-        logger.info("Initializing TextaGuiWindow...")
+        logger.info("Initializing TextaGuiWindow with enhanced styling...")
         
         self.setWindowTitle("Texta AI")
+        # Prioritize FramelessWindowHint and WindowStaysOnTopHint. Qt.Tool can be problematic with custom rendering.
         self.setWindowFlags(Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint)
+        # WA_TranslucentBackground is key for custom shapes and shadows.
+        self.setAttribute(Qt.WA_TranslucentBackground, True) 
         
-        # Configurar ícone da aplicação se disponível
+        self._load_fonts()
         self._set_app_icon()
         
-        # Enable custom styling
+        # Main window styling - background will be drawn in paintEvent
         self.setStyleSheet("""
-            QWidget {
-                background-color: #2A2A3A;
-                border-radius: 14px;
-                border: 1px solid #3D3D5C;
+            TextaGuiWindow { /* Target the class itself */
+                background-color: transparent; /* Fully transparent for custom paint */
+                border-radius: 18px; /* Slightly more rounded */
             }
-            QPushButton {
-                background-color: #428BFA;
+            QPushButton#CorrectButton { /* Specific ID for main button */
+                background-color: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #3A86FF, stop:1 #2575FC);
                 color: white;
-                border-radius: 10px;
-                padding: 10px;
-                font-size: 16px;
+                border-radius: 12px;
+                padding: 12px 20px;
+                font-size: 17px;
                 font-weight: bold;
-                font-family: 'Segoe UI', Arial, sans-serif;
+                font-family: 'Inter', 'Segoe UI', Arial, sans-serif;
+                border: 1px solid #4A90FF; /* Subtle border for definition */
+                min-height: 30px; /* Ensure button height */
             }
-            QPushButton:hover {
-                background-color: #529BFF;
+            QPushButton#CorrectButton:hover {
+                background-color: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #4E94FF, stop:1 #3A86FF);
+                border: 1px solid #5A9FFF;
             }
-            QPushButton:pressed {
-                background-color: #3272D9;
+            QPushButton#CorrectButton:pressed {
+                background-color: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #2A70F0, stop:1 #1A60E0);
+                border: 1px solid #3A70F0;
             }
-            QLabel {
-                color: #E0E0E0;
-                font-family: 'Segoe UI', Arial, sans-serif;
-                font-size: 14px;
+            QPushButton#CorrectButton:disabled {
+                background-color: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #5A6883, stop:1 #4A5873);
+                color: #A0A0B0;
+                border: 1px solid #6A7893;
+            }
+            QLabel#TitleLabel {
+                color: #ECECF1;
+                font-family: 'Inter', 'Segoe UI', Arial, sans-serif;
+                font-size: 20px;
+                font-weight: bold;
+            }
+            QLabel#InstructionLabel {
+                color: #B0B0C0;
+                font-family: 'Inter', 'Segoe UI', Arial, sans-serif;
+                font-size: 11px; /* Slightly smaller for less emphasis */
+                line-height: 1.4;
+            }
+            QLabel#StatusLabel {
+                color: #D0D0E0;
+                font-family: 'Inter', 'Segoe UI', Arial, sans-serif;
+                font-size: 12px;
+            }
+            QLabel#VersionLabel {
+                color: #606070;
+                font-family: 'Inter', 'Segoe UI', Arial, sans-serif;
+                font-size: 10px;
+            }
+             QLabel#TextTitleLabel { /* For "Texto para corrigir" and "Texto corrigido" */
+                color: #D0D0D5;
+                font-family: 'Inter', 'Segoe UI', Arial, sans-serif;
+                font-size: 15px;
+                font-weight: 500; /* Medium weight */
+                padding-left: 2px;
             }
             QTextEdit {
-                background-color: #1E1E2A;
-                color: #FFFFFF;
-                border-radius: 8px;
-                border: 1px solid #3D3D5C;
-                font-family: 'Segoe UI', Arial, sans-serif;
+                background-color: #161A22; /* Darker background for text areas */
+                color: #E0E0E5;
+                border-radius: 10px;
+                border: 1px solid #2A2E3A;
+                font-family: 'Inter', 'Segoe UI', Arial, sans-serif;
                 font-size: 14px;
-                padding: 8px;
+                padding: 10px;
+                selection-background-color: #3A86FF;
+                selection-color: #FFFFFF;
+            }
+            QTextEdit:focus {
+                border: 1px solid #3A86FF; /* Highlight border on focus */
+            }
+            /* Styling for Close and Settings buttons */
+            QPushButton#SettingsButton, QPushButton#CloseButton {
+                background-color: transparent;
+                color: #9090A0;
+                border: none;
+                border-radius: 15px; /* Circular hover */
+                font-size: 18px; /* Larger icon */
+                font-weight: bold;
+            }
+            QPushButton#SettingsButton:hover, QPushButton#CloseButton:hover {
+                background-color: rgba(255, 255, 255, 0.1);
+                color: #E0E0E0;
+            }
+            QPushButton#SettingsButton:pressed, QPushButton#CloseButton:pressed {
+                background-color: rgba(255, 255, 255, 0.15);
             }
         """)
         
-        # Set fixed size for the window (increased size to fit text areas)
-        self.setFixedSize(820, 500)
+        # Apply shadow effect to the whole window
+        # This needs to be applied *after* WA_TranslucentBackground is set
+        # and ideally after the main stylesheet is applied, if it affects background.
+        shadow_effect = QGraphicsDropShadowEffect(self)
+        shadow_effect.setBlurRadius(25) 
+        shadow_effect.setColor(QColor(0, 0, 0, 100)) 
+        shadow_effect.setOffset(0, 4) 
+        self.setGraphicsEffect(shadow_effect)
         
-        # Create layout
+        self.setFixedSize(830, 520) 
+        
         self._init_ui()
         
-        # Initialize variables for dragging window
         self.dragging = False
         self.offset = QPoint()
-        
-        # For tracking button state
         self.is_processing = False
-        
-        # For storing original and corrected text
         self.original_text = ""
         self.corrected_text = ""
         
-        logger.info("TextaGuiWindow initialized.")
+        logger.info("TextaGuiWindow initialized with new styles.")
+
+    def _load_fonts(self):
+        """Load modern fonts for the application."""
+        try:
+            font_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'src', 'resources', 'fonts')
+            fonts_to_load = {
+                "Inter-Regular.otf": False,
+                "Inter-Medium.otf": False,
+                "Inter-Bold.otf": False
+            }
+            loaded_count = 0
+
+            for font_file in fonts_to_load.keys():
+                font_path = os.path.join(font_dir, font_file)
+                if os.path.exists(font_path):
+                    font_id = QFontDatabase.addApplicationFont(font_path)
+                    if font_id != -1:
+                        font_families = QFontDatabase.applicationFontFamilies(font_id)
+                        if font_families:
+                            logger.info(f"Successfully loaded font: {font_file} (Family: {font_families[0]})")
+                            fonts_to_load[font_file] = True
+                            loaded_count += 1
+                        else:
+                            logger.warning(f"Loaded font {font_file} but no families found.")
+                    else:
+                        logger.warning(f"Failed to load font: {font_file} (addApplicationFont returned -1)")
+                else:
+                    logger.warning(f"Font file not found: {font_path}")
+            
+            if loaded_count > 0:
+                logger.info(f"Successfully loaded {loaded_count} Inter font variants.")
+            else:
+                logger.warning("Could not load any Inter fonts from resources. System fallbacks will be used.")
+
+        except Exception as e:
+            logger.warning(f"Error loading fonts: {e}", exc_info=True)
 
     def _set_app_icon(self):
         """Configura o ícone da aplicação a partir de resources."""
-        # Verificar se o diretório de recursos existe
         resources_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'src', 'resources', 'images')
         logo_path = os.path.join(resources_dir, 'logo.png')
         
-        # Verificar se o arquivo de logo existe
         if os.path.exists(logo_path):
-            logger.info(f"Usando logo em: {logo_path}")
+            logger.info(f"Using logo from: {logo_path}")
             self.app_icon = QIcon(logo_path)
             self.setWindowIcon(self.app_icon)
-            # Também definir como ícone para toda a aplicação
             if QApplication.instance():
                 QApplication.instance().setWindowIcon(self.app_icon)
         else:
-            logger.warning(f"Logo não encontrado em: {logo_path}")
+            logger.warning(f"Logo not found at: {logo_path}")
             self.app_icon = None
 
     def _init_ui(self):
         """Initialize user interface components."""
-        # Create main layout
-        self.layout = QHBoxLayout(self)
-        self.layout.setContentsMargins(20, 20, 20, 20)
-        self.layout.setSpacing(15)
+        self.main_layout = QHBoxLayout(self) 
+        self.main_layout.setContentsMargins(20, 20, 20, 20) 
+        self.main_layout.setSpacing(18)
         
-        # Create side panel for controls
-        self.side_panel = QWidget(self)
-        self.side_panel.setFixedWidth(220)
+        # Side Panel
+        self.side_panel = QFrame(self) 
+        self.side_panel.setObjectName("SidePanel")
+        self.side_panel.setFixedWidth(240) 
+        self.side_panel.setStyleSheet("""
+            QFrame#SidePanel {
+                background-color: #1A1E28; 
+                border-radius: 16px;
+            }
+        """)
         self.side_panel_layout = QVBoxLayout(self.side_panel)
-        self.side_panel_layout.setContentsMargins(10, 10, 10, 10)
-        self.side_panel_layout.setSpacing(10)
+        self.side_panel_layout.setContentsMargins(20, 20, 20, 20)
+        self.side_panel_layout.setSpacing(18)
         
-        # Adicionar layout para o logo e título
         self.header_layout = QHBoxLayout()
-        
-        # Adicionar logo (se disponível)
+        self.header_layout.setSpacing(10)
         self.logo_label = QLabel(self.side_panel)
-        self.logo_label.setFixedSize(40, 40)
+        self.logo_label.setFixedSize(36, 36) 
         resources_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'src', 'resources', 'images')
         logo_path = os.path.join(resources_dir, 'logo.png')
-        
         if os.path.exists(logo_path):
             logo_pixmap = QPixmap(logo_path)
-            self.logo_label.setPixmap(logo_pixmap.scaled(40, 40, Qt.KeepAspectRatio, Qt.SmoothTransformation))
-            logger.info(f"Logo carregado da imagem em: {logo_path}")
+            self.logo_label.setPixmap(logo_pixmap.scaled(36, 36, Qt.KeepAspectRatio, Qt.SmoothTransformation))
         else:
-            self.logo_label.setText("🤖")
-            self.logo_label.setStyleSheet("font-size: 24px; color: #428BFA;")
-            logger.warning(f"Logo não encontrado, usando emoji padrão")
-        
+            self.logo_label.setText("🤖") 
+            self.logo_label.setStyleSheet("font-size: 28px; color: #3A86FF;")
+
         self.header_layout.addWidget(self.logo_label)
-        
-        # Create title label
         self.title_label = QLabel("Texta AI", self.side_panel)
-        self.title_label.setAlignment(Qt.AlignCenter)
-        self.title_label.setStyleSheet("""
-            font-size: 18px;
-            font-weight: bold;
-            color: #C0C0E0;
-        """)
+        self.title_label.setObjectName("TitleLabel") 
         self.header_layout.addWidget(self.title_label)
-        
-        # Adicionar header ao layout principal
         self.side_panel_layout.addLayout(self.header_layout)
         
-        # Add instruction label
         self.instruction_label = QLabel("Selecione texto em outro aplicativo\nantes de clicar em Corrigir", self.side_panel)
+        self.instruction_label.setObjectName("InstructionLabel")
         self.instruction_label.setAlignment(Qt.AlignCenter)
-        self.instruction_label.setStyleSheet("""
-            font-size: 11px;
-            color: #A0A0C0;
-        """)
+        self.instruction_label.setWordWrap(True)
         self.side_panel_layout.addWidget(self.instruction_label)
         
-        # Create the correction button
         self.correct_button = QPushButton("Corrigir", self.side_panel)
-        self.correct_button.clicked.connect(self._on_button_clicked)
+        self.correct_button.setObjectName("CorrectButton") 
         self.correct_button.setCursor(Qt.PointingHandCursor)
+        button_shadow = QGraphicsDropShadowEffect(self.correct_button)
+        button_shadow.setBlurRadius(15)
+        button_shadow.setColor(QColor(0, 0, 0, 70))
+        button_shadow.setOffset(0, 3)
+        self.correct_button.setGraphicsEffect(button_shadow)
+        self.correct_button.clicked.connect(self._on_button_clicked)
         self.side_panel_layout.addWidget(self.correct_button)
         
-        # Status message label
         self.status_label = QLabel("", self.side_panel)
+        self.status_label.setObjectName("StatusLabel")
         self.status_label.setAlignment(Qt.AlignCenter)
         self.status_label.setWordWrap(True)
-        self.status_label.setStyleSheet("""
-            font-size: 11px;
-            color: #E0E0A0;
-        """)
         self.side_panel_layout.addWidget(self.status_label)
         
-        # Add spacer to push version label to bottom
         self.side_panel_layout.addStretch(1)
         
-        # Create version label at the bottom
         self.version_label = QLabel("v1.0", self.side_panel)
+        self.version_label.setObjectName("VersionLabel")
         self.version_label.setAlignment(Qt.AlignRight | Qt.AlignBottom)
-        self.version_label.setStyleSheet("""
-            font-size: 10px;
-            color: #5F5F70;
-        """)
         self.side_panel_layout.addWidget(self.version_label)
         
-        # Add side panel to main layout
-        self.layout.addWidget(self.side_panel)
+        self.main_layout.addWidget(self.side_panel)
         
-        # Create content area for text displays
-        self.content_area = QWidget(self)
-        self.content_layout = QVBoxLayout(self.content_area)
-        self.content_layout.setContentsMargins(0, 0, 0, 0)
-        self.content_layout.setSpacing(15)
-        
-        # Create widgets for original text
-        self.original_text_label = QLabel("Texto para corrigir", self.content_area)
-        self.original_text_label.setStyleSheet("""
-            font-size: 16px;
-            font-weight: bold;
-            color: #E0E0E0;
+        # Content Area
+        self.content_area = QFrame(self) 
+        self.content_area.setObjectName("ContentArea")
+        self.content_area.setStyleSheet("""
+            QFrame#ContentArea {
+                background-color: transparent; 
+            }
         """)
+        self.content_layout = QVBoxLayout(self.content_area)
+        self.content_layout.setContentsMargins(10, 0, 5, 0) 
+        self.content_layout.setSpacing(12)
+        
+        self.original_text_label = QLabel("Texto para corrigir", self.content_area)
+        self.original_text_label.setObjectName("TextTitleLabel")
         self.content_layout.addWidget(self.original_text_label)
         
-        # Original text area
         self.original_text_edit = QTextEdit(self.content_area)
         self.original_text_edit.setReadOnly(True)
-        self.original_text_edit.setMinimumHeight(180)
+        self.original_text_edit.setMinimumHeight(190) 
         self.content_layout.addWidget(self.original_text_edit)
         
-        # Create widgets for corrected text
         self.corrected_text_label = QLabel("Texto corrigido", self.content_area)
-        self.corrected_text_label.setStyleSheet("""
-            font-size: 16px;
-            font-weight: bold;
-            color: #E0E0E0;
-        """)
+        self.corrected_text_label.setObjectName("TextTitleLabel")
         self.content_layout.addWidget(self.corrected_text_label)
         
-        # Corrected text area
         self.corrected_text_edit = QTextEdit(self.content_area)
         self.corrected_text_edit.setReadOnly(True)
-        self.corrected_text_edit.setMinimumHeight(180)
+        self.corrected_text_edit.setMinimumHeight(190) 
         self.content_layout.addWidget(self.corrected_text_edit)
         
-        # Add content area to main layout
-        self.layout.addWidget(self.content_area, 1)
+        self.main_layout.addWidget(self.content_area, 1)
         
-        # Create close button (X) in the top right corner
+        # Close Button
         self.close_button = QPushButton("✕", self)
-        self.close_button.setFixedSize(24, 24)
-        self.close_button.move(self.width() - 30, 8)
+        self.close_button.setObjectName("CloseButton")
+        self.close_button.setFixedSize(32, 32)
+        self.close_button.setCursor(Qt.PointingHandCursor)
         self.close_button.clicked.connect(self.hide)
-        self.close_button.setStyleSheet("""
-            QPushButton {
-                background-color: transparent;
-                border: none;
-                color: #808090;
-                font-size: 16px;
-                padding: 0px;
-            }
-            QPushButton:hover {
-                color: #C0C0C0;
-            }
-        """)
         
-        # Create settings button (gear icon) in the top left corner
+        # Settings Button
         self.settings_button = QPushButton("⚙", self)
-        self.settings_button.setFixedSize(24, 24)
-        self.settings_button.move(8, 8)
-        self.settings_button.setStyleSheet("""
-            QPushButton {
-                background-color: transparent;
-                border: none;
-                color: #808090;
-                font-size: 16px;
-                padding: 0px;
-            }
-            QPushButton:hover {
-                color: #C0C0C0;
-            }
-        """)
-        # Settings button is not connected to any action yet
-        # Will be implemented in a future update
+        self.settings_button.setObjectName("SettingsButton")
+        self.settings_button.setFixedSize(32, 32)
+        self.settings_button.setCursor(Qt.PointingHandCursor)
+        
+        self.close_button.move(self.width() - self.close_button.width() - 12, 12)
+        self.settings_button.move(12, 12)
+
 
     def _on_button_clicked(self):
         """Handle button click: update UI, hide window, and signal WorkflowManager."""
         if self.is_processing:
-            logger.info("Button clicked while processing - ignoring")
             return
         
         logger.info("Correction button clicked. Hiding GUI and signaling workflow.")
-        self._set_processing_state(True) # Disable button, set status
+        self._set_processing_state(True)
         
-        # Clear text areas when starting new correction
         self.original_text_edit.clear()
         self.corrected_text_edit.clear()
         
-        self.hide() # Hide the GUI window to return focus
-        QApplication.processEvents() # Ensure hide event is processed
-        time.sleep(0.05) # Small delay to ensure focus shifts
-        self.button_clicked.emit() # Signal the manager to start the actual workflow
+        self.hide() 
+        QApplication.processEvents() 
+        time.sleep(0.05) 
+        self.button_clicked.emit()
 
-    @Slot(bool) # Accept boolean argument for success status
+    @Slot(bool)
     def reset_state(self, success):
         """Resets the button and status after workflow completion, and reshows the window."""
-        logger.info(f"Resetting GUI state after workflow completion (Success: {success}).")
-        
-        # Re-enable the button first
+        logger.info(f"Resetting GUI state after workflow (Success: {success}).")
         self._set_processing_state(False)
         
-        # Reshow the window if it was hidden by the button click
         if not self.isVisible():
-            logger.info("Reshowing GUI window after workflow completion.")
-            self.toggle_visibility() # Make it visible again, near the cursor
+            logger.info("Reshowing GUI window.")
+            self.toggle_visibility() 
         
-        # Update status message based on success (the message might have been set during error handling)
-        if success and "Erro" not in self.status_label.text(): # Only overwrite if no error was explicitly set
+        if success and "Erro" not in self.status_label.text():
             self.set_status("Texto corrigido!")
-            QTimer.singleShot(2500, lambda: self.set_status("")) # Clear success message after 2.5s
-        elif not success and not self.status_label.text(): # If workflow failed but no specific error was set
+            QTimer.singleShot(3000, lambda: self.set_status("")) 
+        elif not success and not self.status_label.text(): 
             self.set_status("Ocorreu um erro no fluxo.", error=True)
-        # Error messages set previously via set_status will persist
 
     @Slot(str, bool)
     def set_status(self, message, error=False):
         """Set the status message with optional error styling."""
-        logger.info(f"Definindo status: {message} (erro={error})")
-        # Update status immediately if window is visible
+        logger.info(f"Setting status: {message} (error={error})")
         if self.isVisible():
             self.status_label.setText(message)
             if error:
-                self.status_label.setStyleSheet("""
-                    font-size: 11px;
-                    color: #FF9090; /* Reddish for errors */
-                """)
+                self.status_label.setStyleSheet("color: #FF7070; font-size: 12px; font-family: 'Inter', 'Segoe UI', Arial, sans-serif;")
             else:
-                 # Yellowish for success/info
-                self.status_label.setStyleSheet("""
-                    font-size: 11px;
-                    color: #E0E0A0;
-                """)
-            # Make sure the message is immediately visible
+                self.status_label.setStyleSheet("color: #A0FFA0; font-size: 12px; font-family: 'Inter', 'Segoe UI', Arial, sans-serif;") 
             self.update()
         else:
-            # If window is hidden, just log the status
-             log_level = logging.ERROR if error else logging.INFO
-             logger.log(log_level, f"Status update (GUI hidden): {message}")
+            log_level = logging.ERROR if error else logging.INFO
+            logger.log(log_level, f"Status (GUI hidden): {message}")
 
     @Slot(str, str)
     def set_text_content(self, original_text, corrected_text):
-        """Update the text areas with original and corrected text.
-        
-        Args:
-            original_text (str): The original, uncorrected text
-            corrected_text (str): The corrected text (can be empty)
-        """
-        logger.info("Atualizando conteúdo de texto na GUI")
+        """Update the text areas with original and corrected text."""
+        logger.info("Updating text content in GUI")
         self.original_text = original_text
         self.corrected_text = corrected_text
-        
-        # Update UI text areas
         self.original_text_edit.setText(original_text)
         self.corrected_text_edit.setText(corrected_text)
-        
-        # Update the display
-        self.update()
+        # Ensure the text areas are repainted, especially if the window was hidden
+        if self.isVisible():
+            self.original_text_edit.repaint()
+            self.corrected_text_edit.repaint()
+        self.update() # General update for the window
 
     def _set_processing_state(self, is_processing):
         """Update the UI to reflect the processing state."""
         self.is_processing = is_processing
-        
+        self.correct_button.setEnabled(not is_processing)
         if is_processing:
             self.correct_button.setText("Processando...")
-            self.correct_button.setEnabled(False)
-            self.correct_button.setStyleSheet("""
-                background-color: #3272D9;
-                color: #CCCCCC;
-                border-radius: 10px;
-                padding: 10px;
-                font-size: 16px;
-                font-weight: bold;
-                font-family: 'Segoe UI', Arial, sans-serif;
-            """)
-            self.set_status("Corrigindo texto...") # Status shown when processing starts
+            self.set_status("Corrigindo texto...")
         else:
             self.correct_button.setText("Corrigir")
-            self.correct_button.setEnabled(True)
-            self.correct_button.setStyleSheet("")  # Reset to default style
     
+    def paintEvent(self, event):
+        """Override to create custom painting for the window background."""
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.Antialiasing)
+        
+        path = QPainterPath()
+        # Use self.rect() which is the widget's rectangle in its own coordinates.
+        # The shadow effect is outside this, handled by QGraphicsDropShadowEffect.
+        path.addRoundedRect(self.rect(), 18, 18) 
+        
+        gradient = QLinearGradient(0, 0, 0, self.height()) 
+        gradient.setColorAt(0, QColor(32, 36, 48))    
+        gradient.setColorAt(0.5, QColor(28, 31, 42))  
+        gradient.setColorAt(1, QColor(22, 25, 34))    
+        
+        painter.fillPath(path, gradient)
+        
+        # It's generally better not to call super().paintEvent(event) when doing fully custom
+        # background painting for a widget with WA_TranslucentBackground, as it might interfere.
+        # super().paintEvent(event) 
+
     def mousePressEvent(self, event):
         """Handle mouse press events for window dragging."""
         if event.button() == Qt.LeftButton:
-            # Check if click is in the title bar area (excluding buttons)
-            if (event.position().y() < 40 and
-                event.position().x() > 30 and
-                event.position().x() < self.width() - 30):
+            if (event.position().y() < 50 and 
+                event.position().x() > self.settings_button.width() + 15 and
+                event.position().x() < self.width() - self.close_button.width() - 15):
                 self.dragging = True
                 self.offset = event.position().toPoint()
         super().mousePressEvent(event)
@@ -393,7 +427,8 @@ class TextaGuiWindow(QWidget):
     def mouseMoveEvent(self, event):
         """Handle mouse move events for window dragging."""
         if self.dragging and event.buttons() & Qt.LeftButton:
-            self.move(self.mapToGlobal(event.position().toPoint()) - self.offset)
+            new_pos = self.mapToGlobal(event.position().toPoint()) - self.offset
+            self.move(new_pos)
         super().mouseMoveEvent(event)
                 
     def mouseReleaseEvent(self, event):
@@ -402,75 +437,42 @@ class TextaGuiWindow(QWidget):
             self.dragging = False
         super().mouseReleaseEvent(event)
 
+    def resizeEvent(self, event):
+        """ Ensure buttons are repositioned on resize (though window is fixed size now) """
+        super().resizeEvent(event)
+        # Ensure buttons are correctly placed even if size changes (e.g. due to system scaling)
+        if hasattr(self, 'close_button') and self.close_button:
+             self.close_button.move(self.width() - self.close_button.width() - 12, 12)
+        if hasattr(self, 'settings_button') and self.settings_button:
+             self.settings_button.move(12, 12)
+
+
     def toggle_visibility(self):
         """Toggle the visibility of the window."""
-        logger.info(f"Toggle visibility called. Current visibility: {self.isVisible()}")
-        
+        logger.info(f"Toggle visibility. Is visible: {self.isVisible()}")
         try:
             if self.isVisible():
-                logger.info("Window is visible, hiding now")
                 self.hide()
             else:
-                logger.info("Window is hidden, showing now")
-                
-                # Get cursor position for positioning the window
                 cursor_pos = QCursor.pos()
-                logger.info(f"Cursor position: {cursor_pos.x()}, {cursor_pos.y()}")
+                screen = QApplication.screenAt(cursor_pos) 
+                if not screen: screen = QApplication.primaryScreen()
                 
-                # Get screen where cursor is located
-                screen = QApplication.primaryScreen()
-                screens = QApplication.screens()
-                logger.info(f"Number of screens: {len(screens)}")
+                screen_geometry = screen.availableGeometry()
+                x = max(screen_geometry.left(), min(cursor_pos.x() - self.width() // 2, screen_geometry.right() - self.width()))
+                y = max(screen_geometry.top(), min(cursor_pos.y() - self.height() // 2, screen_geometry.bottom() - self.height()))
                 
-                # Try to get the screen at cursor position
-                for s in screens:
-                    geometry = s.geometry()
-                    logger.info(f"Screen geometry: {geometry.left()}, {geometry.top()}, {geometry.width()}, {geometry.height()}")
-                    if geometry.contains(cursor_pos):
-                        screen = s
-                        logger.info(f"Found screen containing cursor: {s.name()}")
-                        break
-                
-                if screen:
-                    # Get screen geometry and calculate center position
-                    screen_geometry = screen.availableGeometry()
-                    window_width = self.width()
-                    window_height = self.height()
-                    
-                    # Position near cursor but keep within screen bounds
-                    pos_x = max(screen_geometry.left(), 
-                               min(cursor_pos.x() - window_width // 2,
-                                   screen_geometry.right() - window_width))
-                    pos_y = max(screen_geometry.top(), 
-                               min(cursor_pos.y() - window_height // 2,
-                                   screen_geometry.bottom() - window_height))
-                    
-                    logger.info(f"Moving window to position: {pos_x}, {pos_y} on screen: {screen.name()}")
-                    self.move(pos_x, pos_y)
-                else:
-                    # Fallback to center of primary screen
-                    logger.warning("Could not determine screen, centering on primary screen")
-                    center = QApplication.primaryScreen().availableGeometry().center()
-                    self.move(center.x() - self.width() // 2, center.y() - self.height() // 2)
-                
-                # Ensure window is visible, active and on top using multiple approaches
-                logger.info("Making window visible using multiple techniques")
-                self.setWindowState(self.windowState() & ~Qt.WindowMinimized)
-                
-                # Make the window visible
+                self.move(x, y)
+                self.setWindowState((self.windowState() & ~Qt.WindowMinimized) | Qt.WindowActive)
                 self.show()
-                QApplication.processEvents()  # Process pending events immediately
-                
                 self.raise_()
-                QApplication.processEvents()
-                
                 self.activateWindow()
-                QApplication.processEvents()
-                
-                # Force update/repaint
-                self.update()
-                self.repaint()
-                
-                logger.info("Window should now be visible and active")
+                # Force an update of the text areas if they have content, after window is shown
+                if self.original_text or self.corrected_text:
+                    self.original_text_edit.setText(self.original_text)
+                    self.corrected_text_edit.setText(self.corrected_text)
+                    self.original_text_edit.repaint()
+                    self.corrected_text_edit.repaint()
+                logger.info("Window shown and activated.")
         except Exception as e:
             logger.error(f"Error in toggle_visibility: {e}", exc_info=True) 
