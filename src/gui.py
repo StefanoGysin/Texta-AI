@@ -43,7 +43,6 @@ class TextaGuiWindow(QWidget):
         self._load_fonts()
         self._set_app_icon()
         
-        # Main window styling - background will be drawn in paintEvent
         self.setStyleSheet("""
             TextaGuiWindow { /* Target the class itself */
                 background-color: transparent; /* Fully transparent for custom paint */
@@ -132,20 +131,29 @@ class TextaGuiWindow(QWidget):
             QPushButton#SettingsButton:pressed, QPushButton#CloseButton:pressed {
                 background-color: rgba(255, 255, 255, 0.15);
             }
+            QFrame#windowFrame {
+                background-color: transparent;
+                border-radius: 18px;
+            }
         """)
         
-        # Apply shadow effect to the whole window
-        # This needs to be applied *after* WA_TranslucentBackground is set
-        # and ideally after the main stylesheet is applied, if it affects background.
-        shadow_effect = QGraphicsDropShadowEffect(self)
-        shadow_effect.setBlurRadius(25) 
-        shadow_effect.setColor(QColor(0, 0, 0, 100)) 
-        shadow_effect.setOffset(0, 4) 
-        self.setGraphicsEffect(shadow_effect)
+        # Em vez de aplicar a sombra à janela principal, vamos usar uma abordagem diferente
+        # que não causa o erro de UpdateLayeredWindowIndirect
         
-        self.setFixedSize(830, 520) 
+        # Criar frame interno que conterá todo o conteúdo
+        self.windowFrame = QFrame(self)
+        self.windowFrame.setObjectName("windowFrame")
         
+        # Configurar layout principal para conter apenas o windowFrame
+        self.main_layout = QVBoxLayout(self)
+        self.main_layout.setContentsMargins(0, 0, 0, 0)
+        self.main_layout.addWidget(self.windowFrame)
+        
+        # Usar _init_ui para configurar o restante da interface
         self._init_ui()
+        
+        # Configurar tamanho fixo
+        self.setFixedSize(830, 520)
         
         self.dragging = False
         self.offset = QPoint()
@@ -208,18 +216,20 @@ class TextaGuiWindow(QWidget):
 
     def _init_ui(self):
         """Initialize user interface components."""
-        self.main_layout = QHBoxLayout(self) 
-        self.main_layout.setContentsMargins(20, 20, 20, 20) 
-        self.main_layout.setSpacing(18)
+        # Agora o layout principal será aplicado ao windowFrame
+        self.frame_layout = QHBoxLayout(self.windowFrame)
+        self.frame_layout.setContentsMargins(20, 20, 20, 20) 
+        self.frame_layout.setSpacing(18)
         
         # Side Panel
-        self.side_panel = QFrame(self) 
+        self.side_panel = QFrame(self.windowFrame) 
         self.side_panel.setObjectName("SidePanel")
         self.side_panel.setFixedWidth(240) 
         self.side_panel.setStyleSheet("""
             QFrame#SidePanel {
                 background-color: #1A1E28; 
                 border-radius: 16px;
+                border: 1px solid #2A2E3A;
             }
         """)
         self.side_panel_layout = QVBoxLayout(self.side_panel)
@@ -275,18 +285,20 @@ class TextaGuiWindow(QWidget):
         self.version_label.setAlignment(Qt.AlignRight | Qt.AlignBottom)
         self.side_panel_layout.addWidget(self.version_label)
         
-        self.main_layout.addWidget(self.side_panel)
+        self.frame_layout.addWidget(self.side_panel)
         
         # Content Area
-        self.content_area = QFrame(self) 
+        self.content_area = QFrame(self.windowFrame) 
         self.content_area.setObjectName("ContentArea")
         self.content_area.setStyleSheet("""
             QFrame#ContentArea {
-                background-color: transparent; 
+                background-color: #1A1E28; 
+                border-radius: 16px;
+                border: 1px solid #2A2E3A;
             }
         """)
         self.content_layout = QVBoxLayout(self.content_area)
-        self.content_layout.setContentsMargins(10, 0, 5, 0) 
+        self.content_layout.setContentsMargins(10, 20, 10, 20) 
         self.content_layout.setSpacing(12)
         
         self.original_text_label = QLabel("Texto para corrigir", self.content_area)
@@ -307,24 +319,23 @@ class TextaGuiWindow(QWidget):
         self.corrected_text_edit.setMinimumHeight(190) 
         self.content_layout.addWidget(self.corrected_text_edit)
         
-        self.main_layout.addWidget(self.content_area, 1)
+        self.frame_layout.addWidget(self.content_area, 1)
         
         # Close Button
-        self.close_button = QPushButton("✕", self)
+        self.close_button = QPushButton("✕", self.windowFrame)
         self.close_button.setObjectName("CloseButton")
         self.close_button.setFixedSize(32, 32)
         self.close_button.setCursor(Qt.PointingHandCursor)
         self.close_button.clicked.connect(self.hide)
         
         # Settings Button
-        self.settings_button = QPushButton("⚙", self)
+        self.settings_button = QPushButton("⚙", self.windowFrame)
         self.settings_button.setObjectName("SettingsButton")
         self.settings_button.setFixedSize(32, 32)
         self.settings_button.setCursor(Qt.PointingHandCursor)
         
-        self.close_button.move(self.width() - self.close_button.width() - 12, 12)
-        self.settings_button.move(12, 12)
-
+        self.close_button.move(self.width() - self.close_button.width() - 24, 24)
+        self.settings_button.move(24, 24)
 
     def _on_button_clicked(self):
         """Handle button click: update UI, hide window, and signal WorkflowManager."""
@@ -404,22 +415,20 @@ class TextaGuiWindow(QWidget):
         painter = QPainter(self)
         painter.setRenderHint(QPainter.Antialiasing)
         
-        path = QPainterPath()
-        # Use self.rect() which is the widget's rectangle in its own coordinates.
-        # The shadow effect is outside this, handled by QGraphicsDropShadowEffect.
-        path.addRoundedRect(self.rect(), 18, 18) 
+        # Pinta o fundo da janela com transparência para evitar artefatos
+        painter.fillRect(self.rect(), QColor(0, 0, 0, 0)) 
         
-        gradient = QLinearGradient(0, 0, 0, self.height()) 
+        # Desenha um fundo com bordas arredondadas para o windowFrame
+        path = QPainterPath()
+        path.addRoundedRect(self.windowFrame.geometry(), 18, 18)
+        
+        gradient = QLinearGradient(0, 0, 0, self.height())
         gradient.setColorAt(0, QColor(32, 36, 48))    
         gradient.setColorAt(0.5, QColor(28, 31, 42))  
-        gradient.setColorAt(1, QColor(22, 25, 34))    
+        gradient.setColorAt(1, QColor(22, 25, 34))
         
         painter.fillPath(path, gradient)
-        
-        # It's generally better not to call super().paintEvent(event) when doing fully custom
-        # background painting for a widget with WA_TranslucentBackground, as it might interfere.
-        # super().paintEvent(event) 
-
+    
     def mousePressEvent(self, event):
         """Handle mouse press events for window dragging."""
         if event.button() == Qt.LeftButton:
@@ -448,9 +457,9 @@ class TextaGuiWindow(QWidget):
         super().resizeEvent(event)
         # Ensure buttons are correctly placed even if size changes (e.g. due to system scaling)
         if hasattr(self, 'close_button') and self.close_button:
-             self.close_button.move(self.width() - self.close_button.width() - 12, 12)
+             self.close_button.move(self.width() - self.close_button.width() - 24, 24)
         if hasattr(self, 'settings_button') and self.settings_button:
-             self.settings_button.move(12, 12)
+             self.settings_button.move(24, 24)
 
 
     def toggle_visibility(self):
