@@ -81,6 +81,8 @@ class WorkflowManager(QObject):
     update_text_display = Signal(str, str)
     # Sinal para atualizar o status na GUI (mensagem, é_erro)
     update_status = Signal(str, bool)
+    # Sinal para solicitar toggle da visibilidade da GUI
+    toggle_gui_requested = Signal()
 
     def __init__(self, animation_window, gui_window=None):
         super().__init__()
@@ -248,7 +250,7 @@ class WorkflowManager(QObject):
         """Alterna a visibilidade da janela da GUI."""
         if self.gui_window:
             logger.info("Alternando visibilidade da janela da GUI.")
-            self.gui_window.toggle_visibility()
+            self.toggle_gui_requested.emit()
         else:
             logger.warning("Tentativa de alternar GUI, mas nenhuma janela GUI foi configurada.")
 
@@ -283,6 +285,10 @@ if __name__ == "__main__":
     
     # 3.2 Conecta o sinal de conclusão do workflow ao reset da GUI
     manager.workflow_complete.connect(gui_win.reset_state, Qt.QueuedConnection)
+    
+    # 3.3 Conecta o sinal de toggle_gui diretamente na GUI usando QueuedConnection
+    # para garantir que a chamada seja feita na thread correta da GUI
+    manager.toggle_gui_requested.connect(gui_win.toggle_visibility, Qt.QueuedConnection)
 
     # 4. Inicia o novo KeyboardManager (baseado em pynput)
     keyboard_manager = KeyboardManager()

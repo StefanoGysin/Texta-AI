@@ -482,12 +482,22 @@ class TextaGuiWindow(QWidget):
                 self.show()
                 self.raise_()
                 self.activateWindow()
-                # Force an update of the text areas if they have content, after window is shown
+                
+                # Use QTimer.singleShot para garantir que atualizações de texto 
+                # ocorram na thread da GUI após a janela ser exibida
                 if self.original_text or self.corrected_text:
-                    self.original_text_edit.setText(self.original_text)
-                    self.corrected_text_edit.setText(self.corrected_text)
-                    self.original_text_edit.repaint()
-                    self.corrected_text_edit.repaint()
+                    QTimer.singleShot(0, self._update_text_content_safely)
+                
                 logger.info("Window shown and activated.")
         except Exception as e:
-            logger.error(f"Error in toggle_visibility: {e}") 
+            logger.error(f"Error in toggle_visibility: {e}")
+            
+    def _update_text_content_safely(self):
+        """Atualiza o conteúdo dos campos de texto de forma thread-safe."""
+        try:
+            self.original_text_edit.setText(self.original_text)
+            self.corrected_text_edit.setText(self.corrected_text)
+            self.update()  # Solicita repintura da janela
+            logger.debug("Text content updated safely in GUI thread")
+        except Exception as e:
+            logger.error(f"Error updating text content safely: {e}") 
