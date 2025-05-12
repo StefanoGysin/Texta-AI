@@ -359,15 +359,25 @@ class TextaGuiWindow(QWidget):
         logger.info(f"Resetting GUI state after workflow (Success: {success}).")
         self._set_processing_state(False)
         
-        if not self.isVisible():
-            logger.info("Reshowing GUI window.")
-            self.toggle_visibility() 
+        # Não mostrar automaticamente a janela após a correção
+        # O código abaixo foi comentado para não forçar a exibição da GUI após cada correção
+        # if not self.isVisible():
+        #     logger.info("Reshowing GUI window.")
+        #     self.toggle_visibility() 
         
-        if success and "Erro" not in self.status_label.text():
-            self.set_status("Texto corrigido!")
-            QTimer.singleShot(3000, lambda: self.set_status("")) 
-        elif not success and not self.status_label.text(): 
-            self.set_status("Ocorreu um erro no fluxo.", error=True)
+        # Apenas atualizar o status se a GUI estiver visível
+        if self.isVisible():
+            if success and "Erro" not in self.status_label.text():
+                self.set_status("Texto corrigido!")
+                QTimer.singleShot(3000, lambda: self.set_status("")) 
+            elif not success and not self.status_label.text(): 
+                self.set_status("Ocorreu um erro no fluxo.", error=True)
+        else:
+            # Registra o resultado no log mesmo se a janela não estiver visível
+            if success:
+                logger.info("Texto corrigido com sucesso! (GUI oculta)")
+            else:
+                logger.warning("Ocorreu um erro no fluxo. (GUI oculta)")
 
     @Slot(str, bool)
     def set_status(self, message, error=False):
