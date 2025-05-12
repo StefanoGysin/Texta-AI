@@ -20,7 +20,14 @@ logger.add(sys.stderr, format="[<level>{level: <8}</level>] <cyan>{module}</cyan
 os.makedirs('logs', exist_ok=True)
 
 # Configurar log para arquivo (sem cores, pois não são úteis em arquivos de log)
-logger.add("logs/texta-ai.log", format="[{level: <8}] {module}: {message}", rotation="10 MB")
+# Habilitamos backtrace=True e diagnose=True para diagnóstico aprimorado em erros
+# backtrace=True: Garante que o traceback completo da exceção seja logado
+# diagnose=True: Mostra os valores das variáveis no traceback, útil para entender o estado da aplicação no momento do erro
+logger.add("logs/texta-ai.log", 
+           format="[{level: <8}] {module}: {message}", 
+           rotation="10 MB", 
+           backtrace=True, 
+           diagnose=True)
 
 # Exporta o logger configurado
 __all__ = ["logger"] 

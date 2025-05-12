@@ -126,6 +126,9 @@ A aplicação utiliza a biblioteca `Loguru` para um sistema de logging detalhado
 - **Níveis de Log:** Diferentes níveis de log são utilizados para granularidade (`DEBUG`, `INFO`, `WARNING`, `ERROR`, `CRITICAL`).
 - **Configuração Centralizada:** A configuração do logger é gerenciada em `src/logger_config.py`.
 - **Criação Automática de Pasta:** A pasta `logs/` é criada automaticamente se não existir.
+- **Diagnóstico Aprimorado de Erros:** Os logs de arquivo incluem rastreamento detalhado de exceções com:
+  - `backtrace=True`: Captura o traceback completo de exceções.
+  - `diagnose=True`: Mostra os valores das variáveis nos diversos níveis do traceback, facilitando a identificação da causa raiz.
 
 ## ❌ Tratamento de Erros
 

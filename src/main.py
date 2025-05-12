@@ -58,15 +58,17 @@ OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 
 # Validação inicial da API Key
 if not OPENAI_API_KEY:
-    logger.error("A variável de ambiente OPENAI_API_KEY não está definida no .env")
-    print("\n!!! ERRO CRÍTICO !!!")
-    print("A variável OPENAI_API_KEY não foi encontrada no arquivo .env.")
-    print("Por favor, crie um arquivo .env na raiz do projeto e adicione a linha:")
-    print("OPENAI_API_KEY=sua_chave_api_aqui")
-    print("Saindo do programa...")
+    logger.error("Chave API da OpenAI não configurada no ambiente")
+    print("\n🚨 ERRO DE CONFIGURAÇÃO 🚨")
+    print("A chave de API da OpenAI não está configurada corretamente.")
+    print("\nPara resolver:")
+    print("1. Crie um arquivo .env na raiz do projeto")
+    print("2. Adicione a seguinte linha:")
+    print("   OPENAI_API_KEY=sua_chave_api_aqui")
+    print("\nEncerrando o programa...")
     exit(1)
 else:
-    logger.info("Chave OPENAI_API_KEY encontrada.")
+    logger.info("Chave OPENAI_API_KEY encontrada, habilitando funcionalidades da API OpenAI.")
 
 # Classe para gerenciar a comunicação entre threads e a GUI
 class WorkflowManager(QObject):
