@@ -12,4 +12,9 @@ loguru # Para logging aprimorado
 pytest
 pytest-mock
 pytest-cov
-pytest-asyncio 
+pytest-asyncio
+
+# Development tools for code quality and formatting
+ruff # Linting e formatação super rápidos
+black # Formatação de código padrão
+isort # Organização de imports 

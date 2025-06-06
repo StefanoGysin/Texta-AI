@@ -1,0 +1,320 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "texta-ai"
+version = "1.0.0"
+description = "Assistente de Correção de Texto Inteligente usando IA"
+readme = "README.md"
+requires-python = ">=3.9"
+authors = [
+    {name = "Texta AI Team"}
+]
+keywords = ["ai", "text-correction", "productivity", "automation"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: End Users/Desktop",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Office/Business :: Office Suites",
+    "Topic :: Text Processing :: Linguistic",
+]
+
+dependencies = [
+    "openai-agents",
+    "openai",
+    "pyperclip",
+    "python-dotenv",
+    "pyautogui",
+    "PySide6",
+    "pynput>=1.7.6",
+    "loguru",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest",
+    "pytest-mock", 
+    "pytest-cov",
+    "pytest-asyncio",
+    "ruff>=0.8.0",
+    "black>=24.0.0",
+    "isort>=5.13.0",
+]
+
+# =============================================================================
+# RUFF CONFIGURATION
+# =============================================================================
+[tool.ruff]
+# Configurações gerais
+line-length = 88
+indent-width = 4
+target-version = "py39"
+
+# Arquivos e diretórios a serem excluídos
+exclude = [
+    ".bzr",
+    ".direnv", 
+    ".eggs",
+    ".git",
+    ".git-rewrite",
+    ".hg",
+    ".ipynb_checkpoints",
+    ".mypy_cache",
+    ".nox",
+    ".pants.d",
+    ".pyenv",
+    ".pytest_cache",
+    ".pytype",
+    ".ruff_cache",
+    ".svn",
+    ".tox",
+    ".venv",
+    ".vscode",
+    "__pypackages__",
+    "_build",
+    "buck-out",
+    "build",
+    "dist",
+    "node_modules",
+    "site-packages",
+    "venv",
+    "logs",
+]
+
+[tool.ruff.lint]
+# Regras habilitadas - configuração otimizada para projetos Python
+select = [
+    "E",     # Pycodestyle errors
+    "W",     # Pycodestyle warnings
+    "F",     # Pyflakes
+    "I",     # Import sorting (isort)
+    "N",     # Naming conventions (PEP8)
+    "D",     # Docstring style (pydocstyle)
+    "UP",    # Pyupgrade - modernização do código
+    "YTT",   # flake8-2020
+    "ANN",   # flake8-annotations
+    "S",     # flake8-bandit (segurança)
+    "BLE",   # flake8-blind-except
+    "FBT",   # flake8-boolean-trap
+    "B",     # flake8-bugbear
+    "A",     # flake8-builtins
+    "COM",   # flake8-commas
+    "C4",    # flake8-comprehensions
+    "DTZ",   # flake8-datetimez
+    "T10",   # flake8-debugger
+    "EM",    # flake8-errmsg
+    "EXE",   # flake8-executable
+    "FA",    # flake8-future-annotations
+    "ISC",   # flake8-implicit-str-concat
+    "ICN",   # flake8-import-conventions
+    "G",     # flake8-logging-format
+    "INP",   # flake8-no-pep420
+    "PIE",   # flake8-pie
+    "T20",   # flake8-print
+    "PYI",   # flake8-pyi
+    "PT",    # flake8-pytest-style
+    "Q",     # flake8-quotes
+    "RSE",   # flake8-raise
+    "RET",   # flake8-return
+    "SLF",   # flake8-self
+    "SLOT",  # flake8-slots
+    "SIM",   # flake8-simplify
+    "TID",   # flake8-tidy-imports
+    "TCH",   # flake8-type-checking
+    "INT",   # flake8-gettext
+    "ARG",   # flake8-unused-arguments
+    "PTH",   # flake8-use-pathlib
+    "ERA",   # eradicate (comentários mortos)
+    "PD",    # pandas-vet
+    "PGH",   # pygrep-hooks
+    "PL",    # Pylint
+    "TRY",   # tryceratops
+    "FLY",   # flynt
+    "NPY",   # NumPy specific rules
+    "PERF",  # Perflint
+    "RUF",   # Ruff-specific rules
+]
+
+# Regras ignoradas (ajuste conforme necessário)
+ignore = [
+    "E501",   # Line too long (gerenciado pelo formatter)
+    "D100",   # Missing docstring in public module
+    "D101",   # Missing docstring in public class 
+    "D102",   # Missing docstring in public method
+    "D103",   # Missing docstring in public function
+    "D104",   # Missing docstring in public package
+    "D105",   # Missing docstring in magic method
+    "D107",   # Missing docstring in __init__
+    "S101",   # Use of assert detected
+    "COM812", # Trailing comma missing (conflita com formatter)
+    "COM819", # Trailing comma prohibited (conflita com formatter)
+    "ISC001", # Implicitly concatenated string literals (conflita com formatter)
+    "Q000",   # Single quotes found but double quotes preferred (conflita com formatter)
+    "Q001",   # Single quote docstring found but double quotes preferred
+    "Q002",   # Double quote docstring found but single quotes preferred
+    "Q003",   # Change outer quotes to avoid escaping inner quotes
+]
+
+# Permite correção automática para todas as regras habilitadas
+fixable = ["ALL"]
+unfixable = []
+
+# Permite variáveis não utilizadas quando prefixadas com underscore
+dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
+
+[tool.ruff.lint.per-file-ignores]
+# Configurações específicas por arquivo
+"__init__.py" = ["E402", "F401", "F403", "F811"] # Imports em __init__.py
+"tests/**/*" = ["S101", "PLR2004", "ANN", "D"] # Testes podem usar assert, números mágicos, etc.
+"scripts/**/*" = ["T20", "S101", "N999"] # Scripts podem usar print, assert e nomes com hífens
+
+[tool.ruff.lint.pydocstyle]
+# Convenção do Google para docstrings
+convention = "google"
+
+[tool.ruff.lint.pylint]
+# Configurações do Pylint
+max-args = 7
+max-branches = 15
+max-returns = 8
+max-statements = 60
+
+[tool.ruff.lint.isort]
+# Configurações do isort integradas no Ruff
+known-first-party = ["src"]
+force-sort-within-sections = true
+split-on-trailing-comma = true
+
+[tool.ruff.format]
+# Configurações do formatter (compatível com Black)
+quote-style = "double"
+indent-style = "space"
+skip-magic-trailing-comma = false
+line-ending = "auto"
+docstring-code-format = true
+docstring-code-line-length = "dynamic"
+
+# =============================================================================
+# BLACK CONFIGURATION (caso prefira usar Black separadamente)
+# =============================================================================
+[tool.black]
+line-length = 88
+target-version = ['py39', 'py310', 'py311', 'py312']
+include = '\.pyi?$'
+extend-exclude = '''
+# A regex preceded with ^/ will apply only to files and directories
+# in the root of the project.
+^/(
+  (
+      \.eggs
+    | \.git
+    | \.hg
+    | \.mypy_cache
+    | \.tox
+    | \.venv
+    | _build
+    | buck-out
+    | build
+    | dist
+    | logs
+  )/
+)
+'''
+
+# =============================================================================
+# ISORT CONFIGURATION (caso prefira usar isort separadamente)
+# =============================================================================
+[tool.isort]
+profile = "black"
+line_length = 88
+multi_line_output = 3
+include_trailing_comma = true
+force_grid_wrap = 0
+use_parentheses = true
+ensure_newline_before_comments = true
+known_first_party = ["src"]
+known_third_party = [
+    "openai",
+    "openai_agents", 
+    "pyperclip",
+    "pyautogui",
+    "PySide6",
+    "pynput",
+    "loguru",
+    "pytest",
+]
+sections = ["FUTURE", "STDLIB", "THIRDPARTY", "FIRSTPARTY", "LOCALFOLDER"]
+lines_after_imports = 2
+force_sort_within_sections = true
+combine_as_imports = true
+
+# =============================================================================
+# PYTEST CONFIGURATION
+# =============================================================================
+[tool.pytest.ini_options]
+# Configuração do pytest (migrada de pytest.ini)
+testpaths = ["tests"]
+python_files = ["test_*.py", "*_test.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = [
+    "--strict-markers",
+    "--strict-config", 
+    "--verbose",
+    "--tb=short",
+    "--cov=src",
+    "--cov-report=term-missing",
+    "--cov-report=html:htmlcov",
+    "--cov-report=xml",
+    "--cov-fail-under=65",
+]
+asyncio_default_fixture_loop_scope = "function"
+filterwarnings = [
+    "ignore::pytest.PytestUnraisableExceptionWarning",
+    "ignore::RuntimeWarning:asyncio",
+    "ignore:coroutine.*was never awaited:RuntimeWarning",
+]
+cache_dir = ".pytest_temp_cache"
+markers = [
+    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+    "integration: marks tests as integration tests",
+    "unit: marks tests as unit tests",
+]
+
+# =============================================================================
+# COVERAGE CONFIGURATION
+# =============================================================================
+[tool.coverage.run]
+source = ["src"]
+omit = [
+    "*/tests/*",
+    "*/test_*",
+    "*/__pycache__/*",
+    "*/site-packages/*",
+    "setup.py",
+]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "if self.debug:",
+    "if settings.DEBUG",
+    "raise AssertionError",
+    "raise NotImplementedError",
+    "if 0:",
+    "if __name__ == .__main__.:",
+    "class .*\\bProtocol\\):",
+    "@(abc\\.)?abstractmethod",
+]
+show_missing = true
+precision = 2
+
+[tool.coverage.html]
+directory = "htmlcov" 

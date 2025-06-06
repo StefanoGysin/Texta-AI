@@ -71,7 +71,13 @@ A ferramenta funciona em qualquer aplicativo onde você possa selecionar e colar
 
 4. **Configure o Arquivo .env**
    
-   Crie um arquivo `.env` na raiz do projeto com as seguintes configurações:
+   Crie um arquivo `.env` na raiz do projeto copiando o arquivo de exemplo:
+   ```bash
+   # Windows (PowerShell)
+   cp .env.example .env
+   ```
+   
+   Em seguida, edite o arquivo `.env` e preencha com seus valores:
    ```env
    # Sua chave de API da OpenAI (obrigatória)
    OPENAI_API_KEY=sua_chave_api_aqui

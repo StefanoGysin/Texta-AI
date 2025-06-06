@@ -163,4 +163,36 @@ desktop.ini
 qt.conf
 
 # Project Specific Logs Folder
-logs/ 
+logs/
+
+# =============================================================================
+# CODE QUALITY TOOLS - CACHES E OUTPUTS
+# =============================================================================
+
+# Ruff cache
+.ruff_cache/
+
+# Black cache
+.black_cache/
+
+# isort cache
+.isort.cfg
+
+# Bandit security linter
+.bandit
+
+# Coverage reports (additional formats)
+.coverage.*
+htmlcov/
+.pytest_cache/
+coverage.html
+coverage.json
+
+# Profiling outputs
+*.prof
+*.pstats
+
+# Temporary files from development tools
+*.tmp
+*.temp
+.DS_Store
