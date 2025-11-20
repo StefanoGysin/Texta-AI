@@ -30,7 +30,7 @@ A ferramenta funciona em qualquer aplicativo onde você possa selecionar e colar
 - Poetry para gerenciamento de dependências e ambiente virtual
 - Sistema operacional: Windows (testado no Windows 11)
 
-## 📥 Instalação
+## 📥 Configuração do Ambiente
 1. **Clone o Repositório** (se ainda não o fez)
    ```bash
    git clone https://github.com/seu-usuario/texta-ai.git
@@ -38,12 +38,10 @@ A ferramenta funciona em qualquer aplicativo onde você possa selecionar e colar
    ```
 
 2. **Instale o Poetry** (se ainda não o tem)
-   Poetry é o gerenciador de dependências e ambientes virtuais preferido para este projeto.
-   ```bash
-   # Para Windows (execute no PowerShell):
+   Poetry é o gerenciador de dependências e ambientes virtuais do projeto.
+   ```powershell
+   # Execute no PowerShell:
    (Invoke-WebRequest -Uri https://install.python-poetry.org -UseBasicParsing).Content | python -
-   # Para Linux/macOS:
-   curl -sSL https://install.python-poetry.org | python3 -
    ```
    Após a instalação, pode ser necessário reiniciar seu terminal ou adicionar o Poetry ao PATH.
 
@@ -153,27 +151,19 @@ Se a ferramenta não estiver funcionando como esperado:
 ## 📊 Status do Projeto
 
 - **Versão Atual**: 1.0.0
-- **Cobertura de Testes**: 65%
+- **Cobertura de Testes**: 85%
 - **Testes Unitários**: 59 testes implementados e passando
 - **Estado**: Estável, em fase de testes de confiabilidade
 
 ## 🧪 Executando os Testes
 
-Para executar os testes unitários e verificar a cobertura de código:
+Para executar a suíte completa de testes unitários e gerar um relatório de cobertura de código, utilize o seguinte comando:
 
 ```bash
-# Ativa o ambiente virtual do Poetry e executa o pytest
 poetry run pytest
-
-# Executar todos os testes com relatório de cobertura
-poetry run pytest --cov=src tests/
-
-# Executar testes com relatório detalhado de cobertura
-poetry run pytest --cov=src --cov-report=term-missing tests/
-
-# Executar testes de um módulo específico
-poetry run pytest tests/test_capture.py
 ```
+
+Toda a configuração dos testes, incluindo a análise de cobertura, está centralizada no arquivo `pyproject.toml`. O comando acima é suficiente para validar todo o projeto.
 
 O relatório de cobertura mostrará a porcentagem de código coberto por testes para cada módulo em `src/`.
 
