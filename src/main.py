@@ -87,8 +87,8 @@ class WorkflowManager(QObject):
     request_close_animation = Signal()
     # Sinal para indicar que o fluxo terminou (bool indica sucesso)
     workflow_complete = Signal(bool)
-    # Sinal para atualizar os textos na GUI (original, corrigido)
-    update_text_display = Signal(str, str)
+    # Sinal único para atualizar a GUI com o resultado final
+    correction_finished = Signal(str, str)
     # Sinal para atualizar o status na GUI (mensagem, é_erro)
     update_status = Signal(str, bool)
     # Sinal para solicitar toggle da visibilidade da GUI
@@ -102,10 +102,13 @@ class WorkflowManager(QObject):
         super().__init__()
         self.animation_window = animation_window
         self.gui_window = gui_window
-        self._lock = threading.Lock()  # Para evitar execuções simultâneas do workflow
+        self._lock = threading.Lock()
+        
+        # Centraliza o estado do último resultado
+        self.last_original_text = ""
+        self.last_corrected_text = ""
 
         # Conecta os sinais aos slots da janela de animação
-        # Assegura que os slots serão executados na thread da animation_window (GUI thread)
         self.request_start_animation.connect(
             self.animation_window.start_effect, Qt.QueuedConnection
         )
@@ -115,7 +118,7 @@ class WorkflowManager(QObject):
 
         # Conecta os sinais aos slots da GUI (se existir)
         if self.gui_window:
-            self.update_text_display.connect(
+            self.correction_finished.connect(
                 self.gui_window.set_text_content, Qt.QueuedConnection
             )
             self.update_status.connect(self.gui_window.set_status, Qt.QueuedConnection)
@@ -123,10 +126,15 @@ class WorkflowManager(QObject):
     @Slot()
     def run_main_workflow(self) -> None:
         """Inicia o fluxo principal em uma thread separada para não bloquear o chamador."""
-        # Verifica se já há um fluxo em andamento
         if not self._lock.acquire(blocking=False):
             logger.warning("Workflow já em andamento. Ignorando nova chamada.")
             return
+
+        # Limpa o estado anterior antes de um novo fluxo
+        self.last_original_text = ""
+        self.last_corrected_text = ""
+        if self.gui_window:
+            self.correction_finished.emit("", "")
 
         logger.info("Iniciando thread para main_workflow...")
         workflow_thread = threading.Thread(target=self._execute_workflow, daemon=True)
@@ -137,25 +145,26 @@ class WorkflowManager(QObject):
         asyncio.run(self._execute_workflow_async())
 
     async def _execute_workflow_async(self) -> None:
-        """Executa o fluxo principal de captura, correção e colagem.
-
-        Esta função roda em sua própria thread.
-        """
+        """Executa o fluxo principal de captura, correção e colagem."""
         logger.info("Workflow iniciado (thread do workflow). Iniciando fluxo...")
-
         state = self._initialize_workflow_state()
 
         try:
             self._start_animation(state)
-            selected_text = self._capture_text(state)
-            if not selected_text:
+            self.last_original_text = self._capture_text(state)
+            if not self.last_original_text:
                 return
 
-            corrected_text = await self._correct_text_async(selected_text, state)
-            if not corrected_text:
+            self.last_corrected_text = await self._correct_text_async(self.last_original_text, state)
+            if not self.last_corrected_text:
+                if self.gui_window:
+                    self.correction_finished.emit(self.last_original_text, "")
                 return
 
-            self._paste_corrected_text(corrected_text, state)
+            if self.gui_window:
+                self.correction_finished.emit(self.last_original_text, self.last_corrected_text)
+
+            self._paste_corrected_text(self.last_corrected_text, state)
 
         except (OSError, RuntimeError, ValueError) as e:
             self._handle_unexpected_error(e, state)
@@ -175,7 +184,7 @@ class WorkflowManager(QObject):
         logger.debug("Emitindo sinal request_start_animation...")
         self.request_start_animation.emit()
         state["animation_started"] = True
-        time.sleep(0.1)  # Pequena pausa para a janela aparecer
+        time.sleep(0.1)
 
     def _capture_text(self, state: dict) -> str | None:
         """Captura o texto selecionado."""
@@ -194,11 +203,6 @@ class WorkflowManager(QObject):
             return None
 
         logger.info("Texto capturado: '%s...'", selected_text[:70])
-
-        # Atualiza a GUI com o texto original capturado
-        if self.gui_window:
-            self.update_text_display.emit(selected_text, "")
-
         return selected_text
 
     def _handle_capture_error(self, error: Exception, state: dict) -> None:
@@ -206,9 +210,6 @@ class WorkflowManager(QObject):
         logger.error("Erro durante a captura de texto: %s", error)
         state["error_occurred"] = True
         error_message = "Erro ao capturar o texto selecionado."
-        logger.error(
-            "%s Verifique se há texto selecionado e tente novamente.", error_message
-        )
         if self.gui_window:
             self.update_status.emit(error_message, is_error=True)
 
@@ -217,16 +218,12 @@ class WorkflowManager(QObject):
         logger.warning("Nenhum texto selecionado ou capturado.")
         state["error_occurred"] = True
         error_message = "Nenhum texto foi detectado."
-        logger.warning(
-            "%s Certifique-se de que o texto está selecionado...", error_message
-        )
         if self.gui_window:
             self.update_status.emit(error_message, is_error=True)
 
     async def _correct_text_async(self, selected_text: str, state: dict) -> str | None:
         """Executa a correção do texto via OpenAI."""
         logger.info("Etapa 2: Correção do Texto (Chamando Agente OpenAI)")
-
         try:
             corrected_text = await get_corrected_text(selected_text, api_key=OPENAI_API_KEY)
             if not corrected_text:
@@ -234,11 +231,6 @@ class WorkflowManager(QObject):
 
             logger.info("Texto corrigido: '%s...'", corrected_text[:70])
             logger.info("Correção concluída com sucesso.")
-
-            # Atualiza a GUI com o texto corrigido
-            if self.gui_window:
-                self.update_text_display.emit(selected_text, corrected_text)
-
         except (
             OpenAIConnectionError,
             OpenAITimeoutError,
@@ -265,8 +257,6 @@ class WorkflowManager(QObject):
         """Trata erros específicos da API OpenAI."""
         logger.error("Erro durante a correção: %s", error)
         state["error_occurred"] = True
-
-        # Mapear tipos de erro para mensagens específicas
         error_messages = {
             OpenAIConnectionError: "Erro: Falha na conexão com OpenAI.",
             OpenAITimeoutError: "Erro: Timeout na conexão OpenAI.",
@@ -275,21 +265,15 @@ class WorkflowManager(QObject):
             ServiceUnavailableError: "Erro: Serviço OpenAI indisponível.",
             ValueError: "Erro: Falha ao obter correção da IA.",
         }
-
         error_message = error_messages.get(type(error), "Erro na API OpenAI.")
-        logger.error(error_message)
-
         if self.gui_window:
             self.update_status.emit(error_message, is_error=True)
 
-    def _handle_correction_unexpected_error(
-        self, error: Exception, state: dict
-    ) -> None:
+    def _handle_correction_unexpected_error(self, error: Exception, state: dict) -> None:
         """Trata erros inesperados durante a correção."""
         logger.error("Erro inesperado durante a correção: %s", error)
         state["error_occurred"] = True
         error_message = "Erro inesperado na correção."
-        logger.error(error_message)
         if self.gui_window:
             self.update_status.emit(error_message, is_error=True)
 
@@ -307,7 +291,6 @@ class WorkflowManager(QObject):
         logger.error("Erro durante a colagem do texto: %s", error)
         state["error_occurred"] = True
         error_message = "Erro ao colar o texto."
-        logger.error("%s O texto foi corrigido mas não pôde ser colado.", error_message)
         if self.gui_window:
             self.update_status.emit(error_message, is_error=True)
 
@@ -316,28 +299,23 @@ class WorkflowManager(QObject):
         logger.error("Erro inesperado no workflow: %s", error)
         state["error_occurred"] = True
         error_message = "Erro inesperado no processamento."
-        logger.error(error_message)
         if self.gui_window:
             self.update_status.emit(error_message, is_error=True)
 
     def _cleanup_workflow(self, state: dict) -> None:
         """Executa a limpeza final do workflow."""
-        # Garante que a animação feche
         if state["animation_started"]:
             logger.debug("Assegurando fechamento da animação no finally...")
             self.request_close_animation.emit()
-            time.sleep(0.1)  # Pequena pausa para garantir que o sinal seja processado
+            time.sleep(0.1)
 
-        # Restauração do clipboard
         if state["original_clipboard"]:
             logger.info("Etapa 4: Restauração do Clipboard Original")
             self.restore_clipboard(state["original_clipboard"])
 
-        logger.info(
-            "Fim do fluxo (Workflow Thread) - Sucesso: %s", not state["error_occurred"]
-        )
+        logger.info("Fim do fluxo (Workflow Thread) - Sucesso: %s", not state["error_occurred"])
         self.workflow_complete.emit(not state["error_occurred"])
-        self._lock.release()  # Libera o lock para permitir próxima execução
+        self._lock.release()
 
     def restore_clipboard(self, original_content: str) -> None:
         """Restaura o conteúdo original da área de transferência."""
@@ -350,133 +328,66 @@ class WorkflowManager(QObject):
 
     @Slot()
     def toggle_gui(self) -> None:
-        """Alterna a visibilidade da janela da GUI."""
+        """Envia os dados mais recentes para a GUI e solicita que ela apareça."""
         if self.gui_window:
             logger.info("Alternando visibilidade da janela da GUI.")
+            # Garante que a GUI tenha os dados mais recentes ANTES de ser exibida
+            self.correction_finished.emit(self.last_original_text, self.last_corrected_text)
             self.toggle_gui_requested.emit()
         else:
-            logger.warning(
-                "Tentativa de alternar GUI, mas nenhuma janela GUI foi configurada."
-            )
+            logger.warning("Tentativa de alternar GUI, mas nenhuma janela GUI foi configurada.")
 
 
 if __name__ == "__main__":
     logger.info("Iniciando Texta AI...")
-
-    # 1. Inicializa QApplication na thread principal
     app = QApplication(sys.argv)
-
-    # 2. Cria a janela de animação (associada à thread principal)
-    #    Mantê-la viva durante toda a execução da aplicação
     animation_win = MagicAnimationWindow()
-
-    # 2.1 Cria a janela da GUI com botão
-    logger.info("Criando a janela da GUI...")
     gui_win = TextaGuiWindow()
 
-    # Teste de visibilidade - mostra a janela e depois esconde
-    # para verificar se a janela pode ser exibida corretamente
     logger.info("Testando visibilidade da GUI...")
     gui_win.show()
-    app.processEvents()  # Processa eventos pendentes
-    QTimer.singleShot(500, gui_win.hide)  # Esconde após 500ms
+    app.processEvents()
+    QTimer.singleShot(500, gui_win.hide)
 
-    # 3. Cria o gerenciador de workflow
     manager = WorkflowManager(animation_win, gui_win)
-
-    # 3.1 Conecta o botão da GUI ao workflow
     gui_win.button_clicked.connect(manager.run_main_workflow)
-
-    # 3.2 Conecta o sinal de conclusão do workflow ao reset da GUI
     manager.workflow_complete.connect(gui_win.reset_state, Qt.QueuedConnection)
-
-    # 3.3 Conecta o sinal de toggle_gui diretamente na GUI usando QueuedConnection
-    # para garantir que a chamada seja feita na thread correta da GUI
     manager.toggle_gui_requested.connect(gui_win.toggle_visibility, Qt.QueuedConnection)
 
-    # 4. Inicia o novo KeyboardManager (baseado em pynput)
     keyboard_manager = KeyboardManager()
-
-    # 4.1 Registra o hotkey para o workflow principal (Ctrl+Alt+C)
     if not keyboard_manager.add_hotkey(HOTKEY, manager.run_main_workflow):
-        logger.error(
-            "Falha ao registrar a hotkey global '%s'. Verifique as permissões ou conflitos.",
-            HOTKEY,
-        )
-        logger.critical("!!! ERRO CRÍTICO !!!")
-        logger.critical("Não foi possível registrar a hotkey global '%s'.", HOTKEY)
-        logger.critical("Possíveis causas:")
-        logger.critical("- Outro aplicativo já está usando esta combinação de teclas.")
-        logger.critical(
-            "- O programa não tem as permissões necessárias (tente executar como administrador/sudo, se aplicável e seguro)."
-        )
-        logger.critical("Saindo do programa...")
-        # Garante que a GUI saia corretamente se já foi iniciada
+        logger.error("Falha ao registrar a hotkey global '%s'.", HOTKEY)
         app.quit()
         sys.exit(1)
-
-    # 4.2 Registra o hotkey para alternar a janela da GUI (Ctrl+Alt+G)
     if not keyboard_manager.add_hotkey(GUI_HOTKEY, manager.toggle_gui):
-        logger.error(
-            "Falha ao registrar a hotkey da GUI '%s'. Continuando sem esta funcionalidade.",
-            GUI_HOTKEY,
-        )
-        logger.warning(
-            "Atenção: Não foi possível registrar a hotkey da GUI '%s'.", GUI_HOTKEY
-        )
-        logger.warning("A correção via hotkey principal ainda funcionará normalmente.")
+        logger.error("Falha ao registrar a hotkey da GUI '%s'.", GUI_HOTKEY)
     else:
         logger.info("Hotkey da GUI '%s' registrada com sucesso.", GUI_HOTKEY)
 
-    # 4.3 Inicia o listener em modo não-bloqueante
     keyboard_manager.start(block=False)
 
-    # 5. Mensagens de inicialização para o usuário
-    logger.info(
-        "Serviço iniciado. Pressione %s para corrigir texto selecionado diretamente.",
-        HOTKEY,
-    )
-    logger.info("Pressione %s para abrir a interface gráfica com botão.", GUI_HOTKEY)
+    logger.info("Serviço iniciado. Pressione %s para corrigir texto.", HOTKEY)
+    logger.info("Pressione %s para abrir a interface gráfica.", GUI_HOTKEY)
     logger.info("(Pressione Ctrl+C no terminal para encerrar)")
-    logger.info(
-        "Serviço iniciado com GlobalHotKeys. Hotkeys registrados: %s, %s",
-        HOTKEY,
-        GUI_HOTKEY,
-    )
 
-    # 6. Executa o loop de eventos do Qt na thread principal
-    #    E configura o tratamento de sinal para Ctrl+C
-    #    Referência: https://doc.qt.io/qt-6/qcoreapplication.html#exec
-    
-    # Define o manipulador de sinal para chamar app.quit() ao receber SIGINT
     def sigint_handler(*_):
         logger.info("SIGINT recebido. Encerrando a aplicação...")
         QApplication.instance().quit()
 
     signal.signal(signal.SIGINT, sigint_handler)
-
-    # Usa um QTimer para permitir que o interpretador Python processe sinais.
-    # Sem isso, o loop de eventos do Qt pode bloquear o processamento de SIGINT.
     timer = QTimer()
-    timer.start(500)  # Executa a cada 500ms
-    timer.timeout.connect(lambda: None)  # Apenas para manter o loop de eventos ativo
+    timer.start(500)
+    timer.timeout.connect(lambda: None)
 
     try:
         logger.info("Iniciando o loop de eventos principal da aplicação...")
         exit_code = app.exec()
         logger.info(f"Loop de eventos encerrado com código: {exit_code}")
-
     finally:
-        # 7. Cleanup ao sair do loop de eventos
         logger.info("Iniciando cleanup final...")
-
-        # Para o KeyboardManager
         if 'keyboard_manager' in locals() and keyboard_manager.running:
             logger.info("Parando KeyboardManager...")
             keyboard_manager.stop()
             logger.info("KeyboardManager parado.")
-
         logger.info("Encerrando o serviço Texta AI.")
-        # sys.exit(exit_code) # O exit_code pode não estar definido se houve exceção
-        sys.exit(0) # Sai com código de sucesso
-
+        sys.exit(0)

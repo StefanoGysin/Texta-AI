@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import difflib
 from pathlib import Path
 import time
 
@@ -179,8 +180,6 @@ class TextaGuiWindow(QWidget):
         self.dragging = False
         self.offset = QPoint()
         self.is_processing = False
-        self.original_text = ""
-        self.corrected_text = ""
 
         logger.info("TextaGuiWindow initialized with new styles.")
 
@@ -395,9 +394,6 @@ class TextaGuiWindow(QWidget):
         logger.info("Correction button clicked. Hiding GUI and signaling workflow.")
         self._set_processing_state(is_processing=True)
 
-        self.original_text_edit.clear()
-        self.corrected_text_edit.clear()
-
         self.hide()
         QApplication.processEvents()
         time.sleep(0.05)
@@ -405,21 +401,16 @@ class TextaGuiWindow(QWidget):
 
     @Slot(bool)
     def reset_state(self, success: bool) -> None:  # noqa: FBT001
-        """Resets the button and status after workflow completion, and reshows the window."""
+        """Resets the button and status after workflow completion."""
         logger.info(f"Resetting GUI state after workflow (Success: {success}).")
         self._set_processing_state(is_processing=False)
 
-        # Não mostrar automaticamente a janela após a correção
-        # O código foi removido para não forçar a exibição da GUI após cada correção
-
-        # Apenas atualizar o status se a GUI estiver visível
         if self.isVisible():
             if success and "Erro" not in self.status_label.text():
                 self.set_status("Texto corrigido!")
                 QTimer.singleShot(3000, lambda: self.set_status(""))
             elif not success and not self.status_label.text():
                 self.set_status("Ocorreu um erro no fluxo.", error=True)
-        # Registra o resultado no log mesmo se a janela não estiver visível
         elif success:
             logger.info("Texto corrigido com sucesso! (GUI oculta)")
         else:
@@ -432,13 +423,9 @@ class TextaGuiWindow(QWidget):
         if self.isVisible():
             self.status_label.setText(message)
             if error:
-                self.status_label.setStyleSheet(
-                    "color: #FF7070; font-size: 12px; font-family: 'Inter', 'Segoe UI', Arial, sans-serif;"
-                )
+                self.status_label.setStyleSheet("color: #FF7070;")
             else:
-                self.status_label.setStyleSheet(
-                    "color: #A0FFA0; font-size: 12px; font-family: 'Inter', 'Segoe UI', Arial, sans-serif;"
-                )
+                self.status_label.setStyleSheet("color: #A0FFA0;")
             self.update()
         elif error:
             logger.error(f"Status (GUI hidden): {message}")
@@ -447,17 +434,46 @@ class TextaGuiWindow(QWidget):
 
     @Slot(str, str)
     def set_text_content(self, original_text: str, corrected_text: str) -> None:
-        """Update the text areas with original and corrected text."""
-        logger.info("Updating text content in GUI")
-        self.original_text = original_text
-        self.corrected_text = corrected_text
+        """Update the text areas, showing a rich text diff in the corrected text view."""
+        logger.debug(
+            f"GUI received set_text_content. Original: '{original_text[:20]}...'. Corrected: '{corrected_text[:20]}...'"
+        )
         self.original_text_edit.setText(original_text)
-        self.corrected_text_edit.setText(corrected_text)
-        # Ensure the text areas are repainted, especially if the window was hidden
-        if self.isVisible():
-            self.original_text_edit.repaint()
-            self.corrected_text_edit.repaint()
-        self.update()  # General update for the window
+
+        if corrected_text:
+            diff_html = self._generate_diff_html(original_text, corrected_text)
+            self.corrected_text_edit.setHtml(diff_html)
+        else:
+            self.corrected_text_edit.clear()
+
+        self.update()
+
+    def _generate_diff_html(self, text1: str, text2: str) -> str:
+        """Generate an HTML string with diff highlighting."""
+        html = [
+            "<div style=\"font-family: 'Inter', 'Segoe UI', Arial, sans-serif; font-size: 14px; color: #E0E0E5; white-space: pre-wrap;\">"
+        ]
+        
+        matcher = difflib.SequenceMatcher(None, text1, text2)
+
+        for tag, i1, i2, j1, j2 in matcher.get_opcodes():
+            original_segment = text1[i1:i2].replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+            corrected_segment = text2[j1:j2].replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+            original_segment = original_segment.replace("\n", "<br>")
+            corrected_segment = corrected_segment.replace("\n", "<br>")
+
+            if tag == "equal":
+                html.append(corrected_segment)
+            elif tag == "insert":
+                html.append(f'<span style="background-color: #1A4A3A;">{corrected_segment}</span>')
+            elif tag == "delete":
+                html.append(f'<span style="background-color: #5A2A2A; text-decoration: line-through;">{original_segment}</span>')
+            elif tag == "replace":
+                html.append(f'<span style="background-color: #5A2A2A; text-decoration: line-through;">{original_segment}</span>')
+                html.append(f'<span style="background-color: #1A4A3A;">{corrected_segment}</span>')
+        
+        html.append("</div>")
+        return "".join(html)
 
     def _set_processing_state(self, *, is_processing: bool) -> None:
         """Update the UI to reflect the processing state."""
@@ -474,10 +490,8 @@ class TextaGuiWindow(QWidget):
         painter = QPainter(self)
         painter.setRenderHint(QPainter.Antialiasing)
 
-        # Pinta o fundo da janela com transparência para evitar artefatos
         painter.fillRect(self.rect(), QColor(0, 0, 0, 0))
 
-        # Desenha um fundo com bordas arredondadas para o windowFrame
         path = QPainterPath()
         path.addRoundedRect(self.windowFrame.geometry(), 18, 18)
 
@@ -515,7 +529,6 @@ class TextaGuiWindow(QWidget):
     def resizeEvent(self, event: QWidget) -> None:  # noqa: N802
         """Ensure buttons are repositioned on resize (though window is fixed size now)."""
         super().resizeEvent(event)
-        # Ensure buttons are correctly placed even if size changes (e.g. due to system scaling)
         if hasattr(self, "close_button") and self.close_button:
             self.close_button.move(self.width() - self.close_button.width() - 24, 24)
         if hasattr(self, "settings_button") and self.settings_button:
@@ -556,22 +569,6 @@ class TextaGuiWindow(QWidget):
                 self.show()
                 self.raise_()
                 self.activateWindow()
-
-                # Use QTimer.singleShot para garantir que atualizações de texto
-                # ocorram na thread da GUI após a janela ser exibida
-                if self.original_text or self.corrected_text:
-                    QTimer.singleShot(0, self._update_text_content_safely)
-
                 logger.info("Window shown and activated.")
         except (RuntimeError, OSError) as e:
             logger.error(f"Error in toggle_visibility: {e}")
-
-    def _update_text_content_safely(self) -> None:
-        """Atualiza o conteúdo dos campos de texto de forma thread-safe."""
-        try:
-            self.original_text_edit.setText(self.original_text)
-            self.corrected_text_edit.setText(self.corrected_text)
-            self.update()  # Solicita repintura da janela
-            logger.debug("Text content updated safely in GUI thread")
-        except (RuntimeError, AttributeError) as e:
-            logger.error(f"Error updating text content safely: {e}")

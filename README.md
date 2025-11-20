@@ -33,7 +33,7 @@ A ferramenta funciona em qualquer aplicativo onde você possa selecionar e colar
 ## 📥 Configuração do Ambiente
 1. **Clone o Repositório** (se ainda não o fez)
    ```bash
-   git clone https://github.com/seu-usuario/texta-ai.git
+   git clone https://github.com/StefanoGysin/texta-ai.git
    cd texta-ai
    ```
 
