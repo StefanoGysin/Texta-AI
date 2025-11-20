@@ -16,12 +16,13 @@ A ferramenta funciona em qualquer aplicativo onde você possa selecionar e colar
 
 ### ✨ Características
 
-- **Interface Visual Moderna**: Animação minimalista com efeitos de pulso, gradientes e partículas
-- **Feedback em Tempo Real**: A animação segue o cursor e indica o status do processamento
-- **Sistema Robusto**: Tratamento avançado de erros com retentativas automáticas
-- **Alta Confiabilidade**: Cobertura de testes de 87% e validação extensiva
-- **Configurável**: Tecla de atalho e prompt de correção personalizáveis
-- **Logging Detalhado**: Sistema completo de logs para console e arquivo
+- **Interface Visual Moderna**: Animação minimalista com efeitos de pulso, gradientes e partículas.
+- **Visualização de Diferenças (Diff)**: O texto corrigido destaca as alterações, com fundo verde para adições e vermelho (com risco) para remoções, fornecendo um feedback claro e imediato.
+- **Feedback em Tempo Real**: A animação segue o cursor e indica o status do processamento.
+- **Sistema Robusto**: Tratamento avançado de erros com retentativas automáticas.
+- **Alta Confiabilidade**: Cobertura de testes de 87% e validação extensiva.
+- **Configurável**: Tecla de atalho e prompt de correção personalizáveis.
+- **Logging Detalhado**: Sistema completo de logs para console e arquivo.
 
 ## 🛠️ Requisitos
 
