@@ -194,7 +194,7 @@ async def _run_correction_async(text_to_correct: str) -> str | None:
     return None
 
 
-def get_corrected_text(text_to_correct: str, api_key: str | None = None) -> str | None:
+async def get_corrected_text(text_to_correct: str, api_key: str | None = None) -> str | None:
     """Recebe um texto, executa o agente de correção e retorna o texto corrigido.
 
     Args:
@@ -226,21 +226,17 @@ def get_corrected_text(text_to_correct: str, api_key: str | None = None) -> str 
     else:
         logger.debug(f"Usando API key da {key_source}.")
 
+    corrected_text = None
     try:
         logger.info("Iniciando execução do agente...")
-        # Executa a função assíncrona do Runner de forma síncrona
-        corrected_text = asyncio.run(_run_correction_async(text_to_correct))
-    except (RuntimeError, OSError) as e:
-        logger.error(f"Erro não tratado durante a correção: {e}")
-        return None
-    else:
+        # Executa a função assíncrona do Runner
+        corrected_text = await _run_correction_async(text_to_correct)
         if corrected_text:
             logger.info("Execução do agente concluída com sucesso.")
         else:
             logger.error(
                 "A correção falhou após várias tentativas ou devido a erro crítico."
             )
-        return corrected_text
     finally:
         # Restaura a API key original se foi alterada
         if api_key and api_key != original_api_key:
@@ -248,5 +244,7 @@ def get_corrected_text(text_to_correct: str, api_key: str | None = None) -> str 
             if original_api_key:
                 os.environ["OPENAI_API_KEY"] = original_api_key
             else:
-                # Se não havia chave original, remove a temporária
-                del os.environ["OPENAI_API_KEY"]
+                # Se não havia chave original, remove a temporária de forma segura
+                os.environ.pop("OPENAI_API_KEY", None)
+
+    return corrected_text

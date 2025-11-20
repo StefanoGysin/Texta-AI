@@ -1,25 +1,37 @@
 """
 Testes unitários abrangentes para src/main.py
 
-Este módulo testa todas as funcionalidades principais do módulo main.py,
-incluindo o WorkflowManager, inicialização da aplicação, gerenciamento de threads,
-comunicação entre componentes, tratamento de erros e integração com GUI/animação.
+Este módulo testa todas as funcionalidades principais do módulo main.py, incluindo o
+WorkflowManager, inicialização da aplicação, gerenciamento de threads, comunicação
+entre componentes, tratamento de erros e integração com GUI/animação.
 
 Baseado nas melhores práticas do pytest e padrões estabelecidos no projeto.
 """
 
 import contextlib
+import importlib
 import os
 from pathlib import Path
 import threading
-from unittest.mock import MagicMock
+from unittest.mock import AsyncMock, MagicMock
 
 from PySide6.QtCore import Signal
 import pytest
 from pytest_mock import MockerFixture
 
 # Importações do módulo sendo testado
-from src.main import WorkflowManager
+from src.animation import MagicAnimationWindow
+from src.correction import (
+    AuthenticationError,
+    OpenAIConnectionError,
+    OpenAIError,
+    OpenAITimeoutError,
+    RateLimitError,
+    ServiceUnavailableError,
+)
+from src.gui import TextaGuiWindow
+from src.keyboard_listener import KeyboardManager
+from src.main import DEFAULT_GUI_HOTKEY, DEFAULT_HOTKEY, WorkflowManager
 
 
 class TestWorkflowManager:
@@ -145,7 +157,9 @@ class TestWorkflowManager:
             "src.main.capture_selected_text", return_value="texto original"
         )
         mock_correct = mocker.patch(
-            "src.main.get_corrected_text", return_value="texto corrigido"
+            "src.main.get_corrected_text",
+            new_callable=AsyncMock,
+            return_value="texto corrigido",
         )
         mock_paste = mocker.patch("src.main.paste_text")
         mocker.patch("time.sleep")
@@ -168,7 +182,7 @@ class TestWorkflowManager:
 
         # Verificações das chamadas principais
         mock_capture.assert_called_once()
-        mock_correct.assert_called_once_with(
+        mock_correct.assert_awaited_once_with(
             "texto original", api_key=os.getenv("OPENAI_API_KEY")
         )
         mock_paste.assert_called_once_with("texto corrigido")
@@ -194,7 +208,9 @@ class TestWorkflowManager:
         mock_capture = mocker.patch(
             "src.main.capture_selected_text", side_effect=OSError("Erro de captura")
         )
-        mock_correct = mocker.patch("src.main.get_corrected_text")
+        mock_correct = mocker.patch(
+            "src.main.get_corrected_text", new_callable=AsyncMock
+        )
         mock_paste = mocker.patch("src.main.paste_text")
         mocker.patch("time.sleep")
         mocker.patch("pyperclip.paste", return_value="")
@@ -214,7 +230,7 @@ class TestWorkflowManager:
 
         # Verificações
         mock_capture.assert_called_once()
-        mock_correct.assert_not_called()  # Não deve chamar correção se captura falhou
+        mock_correct.assert_not_awaited()  # Não deve chamar correção se captura falhou
         mock_paste.assert_not_called()  # Não deve chamar colagem
 
         # Deve sinalizar falha
@@ -229,7 +245,9 @@ class TestWorkflowManager:
         """Testa workflow quando nenhum texto é capturado."""
         # Mocks
         mock_capture = mocker.patch("src.main.capture_selected_text", return_value="")
-        mock_correct = mocker.patch("src.main.get_corrected_text")
+        mock_correct = mocker.patch(
+            "src.main.get_corrected_text", new_callable=AsyncMock
+        )
         mock_paste = mocker.patch("src.main.paste_text")
         mocker.patch("time.sleep")
         mocker.patch("pyperclip.paste", return_value="")
@@ -248,7 +266,7 @@ class TestWorkflowManager:
 
         # Verificações
         mock_capture.assert_called_once()
-        mock_correct.assert_not_called()
+        mock_correct.assert_not_awaited()
         mock_paste.assert_not_called()
         workflow_manager.workflow_complete.emit.assert_called_once_with(False)  # noqa: FBT003
 
@@ -268,15 +286,6 @@ class TestWorkflowManager:
         self, workflow_manager, mocker: MockerFixture, exception_type, _expected_count
     ):
         """Testa workflow com diferentes tipos de erro da API OpenAI."""
-        from src.correction import (
-            AuthenticationError,
-            OpenAIConnectionError,
-            OpenAIError,
-            OpenAITimeoutError,
-            RateLimitError,
-            ServiceUnavailableError,
-        )
-
         # Mapear string para classe de exceção
         exception_classes = {
             "OpenAIConnectionError": OpenAIConnectionError,
@@ -295,7 +304,9 @@ class TestWorkflowManager:
             "src.main.capture_selected_text", return_value="texto original"
         )
         mock_correct = mocker.patch(
-            "src.main.get_corrected_text", side_effect=exception_class("Erro API")
+            "src.main.get_corrected_text",
+            new_callable=AsyncMock,
+            side_effect=exception_class("Erro API"),
         )
         mock_paste = mocker.patch("src.main.paste_text")
         mocker.patch("time.sleep")
@@ -315,7 +326,7 @@ class TestWorkflowManager:
 
         # Verificações
         mock_capture.assert_called_once()
-        mock_correct.assert_called_once()
+        mock_correct.assert_awaited_once()
         mock_paste.assert_not_called()  # Não deve colar se correção falhou
         workflow_manager.workflow_complete.emit.assert_called_once_with(False)  # noqa: FBT003
 
@@ -328,7 +339,9 @@ class TestWorkflowManager:
             "src.main.capture_selected_text", return_value="texto original"
         )
         mock_correct = mocker.patch(
-            "src.main.get_corrected_text", return_value="texto corrigido"
+            "src.main.get_corrected_text",
+            new_callable=AsyncMock,
+            return_value="texto corrigido",
         )
         mock_paste = mocker.patch(
             "src.main.paste_text", side_effect=OSError("Erro de colagem")
@@ -350,7 +363,7 @@ class TestWorkflowManager:
 
         # Verificações
         mock_capture.assert_called_once()
-        mock_correct.assert_called_once()
+        mock_correct.assert_awaited_once()
         mock_paste.assert_called_once()
         workflow_manager.workflow_complete.emit.assert_called_once_with(False)  # noqa: FBT003
 
@@ -406,10 +419,7 @@ class TestMainModuleEnvironmentSetup:
         mocker.patch.dict("os.environ", {}, clear=True)
 
         # Re-importar o módulo para aplicar as mudanças de ambiente
-        import importlib
-
-        import src.main
-
+        import src.main  # noqa: PLC0415
         importlib.reload(src.main)
 
         # Verificar que as variáveis foram definidas
@@ -452,9 +462,7 @@ class TestMainModuleEnvironmentSetup:
         mocker.patch.dict("os.environ", {"OPENAI_API_KEY": api_key or ""}, clear=True)
 
         # Re-importar módulo para testar validação
-        import importlib
-
-        import src.main
+        import src.main  # noqa: PLC0415
 
         with contextlib.suppress(SystemExit):
             importlib.reload(src.main)
@@ -467,11 +475,6 @@ class TestMainModuleEnvironmentSetup:
     def test_load_environment_variables(self):
         """Testa carregamento das variáveis de ambiente."""
         # Este teste verifica que as constantes do módulo são carregadas corretamente
-        from src.main import (
-            DEFAULT_GUI_HOTKEY,
-            DEFAULT_HOTKEY,
-        )
-
         # Verificar que as constantes padrão estão definidas
         assert DEFAULT_HOTKEY == "ctrl+alt+c"
         assert DEFAULT_GUI_HOTKEY == "ctrl+alt+g"
@@ -503,11 +506,6 @@ class TestMainModuleIntegration:
     def test_application_initialization_flow(self):
         """Testa o fluxo de inicialização da aplicação principal."""
         # Este teste verifica que as classes principais podem ser instanciadas
-        from src.animation import MagicAnimationWindow
-        from src.gui import TextaGuiWindow
-        from src.keyboard_listener import KeyboardManager
-        from src.main import WorkflowManager
-
         # Testar instanciação das classes principais
         animation_window = MagicAnimationWindow()
         gui_window = TextaGuiWindow()
@@ -530,8 +528,6 @@ class TestMainModuleIntegration:
     def test_keyboard_manager_hotkey_registration(self):
         """Testa registro de hotkeys no KeyboardManager."""
         # Testar a funcionalidade do KeyboardManager diretamente
-        from src.keyboard_listener import KeyboardManager
-
         keyboard_manager = KeyboardManager()
 
         # Testar registro de hotkey (pode falhar em ambiente de teste)
@@ -551,8 +547,6 @@ class TestMainModuleIntegration:
     @pytest.mark.usefixtures("mock_environment")
     def test_keyboard_manager_hotkey_registration_failure(self):
         """Testa comportamento quando registro de hotkey falha."""
-        from src.keyboard_listener import KeyboardManager
-
         keyboard_manager = KeyboardManager()
 
         # Testar com callback None (deveria causar AttributeError ao acessar __name__)
@@ -566,10 +560,6 @@ class TestMainModuleIntegration:
     @pytest.mark.usefixtures("mock_environment")
     def test_gui_window_connections(self):
         """Testa conexões entre GUI e WorkflowManager."""
-        from src.animation import MagicAnimationWindow
-        from src.gui import TextaGuiWindow
-        from src.main import WorkflowManager
-
         # Criar instâncias
         animation_window = MagicAnimationWindow()
         gui_window = TextaGuiWindow()
@@ -639,7 +629,11 @@ class TestWorkflowManagerErrorHandling:
         """Testa que cleanup é sempre executado, mesmo com erros."""
         # Mock com sucesso parcial
         mocker.patch("src.main.capture_selected_text", return_value="texto")
-        mocker.patch("src.main.get_corrected_text", return_value="texto corrigido")
+        mocker.patch(
+            "src.main.get_corrected_text",
+            new_callable=AsyncMock,
+            return_value="texto corrigido",
+        )
         mocker.patch("src.main.paste_text", return_value=True)
         mocker.patch("pyperclip.paste", return_value="original")
         mock_copy = mocker.patch("pyperclip.copy")
@@ -680,8 +674,6 @@ class TestWorkflowManagerThreadSafety:
 
     def test_signal_emission_thread_safety(self):
         """Testa que sinais podem ser emitidos com segurança de threads."""
-        from src.main import WorkflowManager
-
         # Usar mocks ao invés de widgets reais para evitar problemas de QApplication
         mock_animation = MagicMock()
         mock_gui = MagicMock()
@@ -699,8 +691,6 @@ class TestWorkflowManagerThreadSafety:
 
     def test_lock_mechanism(self):
         """Testa o mecanismo de lock para thread safety."""
-        from src.main import WorkflowManager
-
         # Criar instância com mocks
         mock_animation = MagicMock()
         mock_gui = MagicMock()
@@ -723,8 +713,6 @@ class TestMainModuleConstants:
 
     def test_default_hotkeys(self):
         """Testa valores padrão das hotkeys."""
-        from src.main import DEFAULT_GUI_HOTKEY, DEFAULT_HOTKEY
-
         assert DEFAULT_HOTKEY == "ctrl+alt+c"
         assert DEFAULT_GUI_HOTKEY == "ctrl+alt+g"
 

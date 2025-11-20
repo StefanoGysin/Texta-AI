@@ -28,91 +28,99 @@ def mock_env_setup(monkeypatch):
     monkeypatch.setenv("OPENAI_API_KEY", "mock-api-key-for-testing")
 
 
-def test_get_corrected_text_success(mocker, mock_env_setup):  # noqa: ARG001
+@pytest.mark.asyncio
+async def test_get_corrected_text_success(mocker, mock_env_setup):  # noqa: ARG001
     """Testa o caso de sucesso onde o texto é corrigido pela API."""
     input_text = "Este é um texto com erros de gramática."
     expected_output = "Este é um texto com correções gramaticais."
 
-    # Mock do asyncio.run para evitar execução real e retornar um valor definido
-    mock_asyncio_run = mocker.patch("asyncio.run")
-    mock_asyncio_run.return_value = expected_output
+    # Mock da função async interna para controlar o retorno
+    mock_run_async = mocker.patch(
+        "src.correction._run_correction_async", new_callable=AsyncMock
+    )
+    mock_run_async.return_value = expected_output
 
     # Testar a função
-    result = get_corrected_text(input_text)
+    result = await get_corrected_text(input_text)
 
     # Verificações
     assert result == expected_output
-    mock_asyncio_run.assert_called_once()
+    mock_run_async.assert_called_once_with(input_text)
 
 
-def test_get_corrected_text_empty_input(mocker, mock_env_setup):  # noqa: ARG001
+@pytest.mark.asyncio
+async def test_get_corrected_text_empty_input(mocker, mock_env_setup):  # noqa: ARG001
     """Testa o comportamento quando a entrada é None ou string vazia."""
     # Mock para evitar execução real
-    mock_asyncio_run = mocker.patch("asyncio.run")
+    mock_run_async = mocker.patch("src.correction._run_correction_async")
 
     # Caso 1: entrada None
-    result_none = get_corrected_text(None)
+    result_none = await get_corrected_text(None)
     assert result_none is None
 
     # Caso 2: string vazia
-    result_empty = get_corrected_text("")
+    result_empty = await get_corrected_text("")
     assert result_empty is None
 
     # Verificar que nenhuma chamada à API foi feita
-    mock_asyncio_run.assert_not_called()
+    mock_run_async.assert_not_called()
 
 
-def test_get_corrected_text_missing_api_key(mocker):
+@pytest.mark.asyncio
+async def test_get_corrected_text_missing_api_key(mocker):
     """Testa o comportamento quando não há API key configurada."""
     input_text = "Este é um texto com erros de gramática."
 
     # Remover a API key do ambiente
     with patch.dict(os.environ, {"OPENAI_API_KEY": ""}, clear=True):
         # Mock para evitar execução real
-        mock_asyncio_run = mocker.patch("asyncio.run")
-
+        mock_run_async = mocker.patch("src.correction._run_correction_async")
         # Executar função sem API key
-        result = get_corrected_text(input_text)
+        result = await get_corrected_text(input_text)
 
         # Verificar que retornou None e não tentou chamar a API
         assert result is None
-        mock_asyncio_run.assert_not_called()
+        mock_run_async.assert_not_called()
 
 
-def test_get_corrected_text_api_failure(mocker, mock_env_setup):  # noqa: ARG001
+@pytest.mark.asyncio
+async def test_get_corrected_text_api_failure(mocker, mock_env_setup):  # noqa: ARG001
     """Testa o comportamento quando a API falha."""
     input_text = "Este é um texto com erros de gramática."
 
-    # Mock do asyncio.run para simular erro na API
-    mock_asyncio_run = mocker.patch("asyncio.run")
-    mock_asyncio_run.return_value = None  # Simulando falha que retorna None
+    # Mock do _run_correction_async para simular erro na API
+    mock_run_async = mocker.patch("src.correction._run_correction_async")
+    mock_run_async.return_value = None  # Simulando falha que retorna None
 
     # Testar a função
-    result = get_corrected_text(input_text)
+    result = await get_corrected_text(input_text)
 
     # Verificar que o resultado é None após falha da API
     assert result is None
-    mock_asyncio_run.assert_called_once()
+    mock_run_async.assert_called_once()
 
 
-def test_get_corrected_text_with_api_key_param(mocker):
+@pytest.mark.asyncio
+async def test_get_corrected_text_with_api_key_param(mocker):
     """Testa usando uma API key via parâmetro em vez de variável de ambiente."""
     input_text = "Este é um texto com erros de gramática."
     api_key = "custom-api-key-via-parameter"
     expected_output = "Este é um texto corrigido."
 
     # Mock para simulação
-    mock_asyncio_run = mocker.patch("asyncio.run")
-    mock_asyncio_run.return_value = expected_output
+    mock_run_async = mocker.patch(
+        "src.correction._run_correction_async", new_callable=AsyncMock
+    )
+    mock_run_async.return_value = expected_output
 
     # Garantir que não há API key no ambiente
     with patch.dict(os.environ, {}, clear=True):
         # Executar função com API key como parâmetro
-        result = get_corrected_text(input_text, api_key=api_key)
+        result = await get_corrected_text(input_text, api_key=api_key)
 
         # Verificar que a API key foi usada corretamente
         assert result == expected_output
-        mock_asyncio_run.assert_called_once()
+        mock_run_async.assert_called_once_with(input_text)
 
         # Verificar que a API key não permaneceu no ambiente após a execução
         assert "OPENAI_API_KEY" not in os.environ

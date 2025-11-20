@@ -132,7 +132,8 @@ venv.bak/
 
 # mkdocs documentation
 /site
-
+/.gemini
+gemini.md
 # mypy
 .mypy_cache/
 .dmypy.json

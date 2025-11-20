@@ -8,7 +8,7 @@ import math
 from unittest.mock import Mock, patch
 
 from PySide6.QtCore import QPoint, Qt, QTimer
-from PySide6.QtGui import QBrush, QColor, QPainter, QPaintEvent
+from PySide6.QtGui import QBrush, QCloseEvent, QColor, QPainter, QPaintEvent
 from PySide6.QtWidgets import QApplication, QWidget
 import pytest
 
@@ -647,9 +647,6 @@ class TestMagicAnimationWindow:
         # Start animation first
         animation_window.start_effect()
 
-        # Create proper QCloseEvent mock
-        from PySide6.QtGui import QCloseEvent
-
         mock_event = Mock(spec=QCloseEvent)
 
         # Mock the super().closeEvent to avoid TypeError
@@ -663,8 +660,6 @@ class TestMagicAnimationWindow:
     def test_close_event_timer_cleanup(self, animation_window):
         """Test that close event stops all timers."""
         animation_window.start_effect()  # Start timers
-
-        from PySide6.QtGui import QCloseEvent
 
         mock_event = Mock(spec=QCloseEvent)
 

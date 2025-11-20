@@ -1,7 +1,6 @@
 from __future__ import annotations
 
-# Configuração para corrigir o erro de DPI Awareness do Qt
-# Deve estar no topo, antes de qualquer importação de PySide6/Qt
+import asyncio
 import os
 
 os.environ["QT_ENABLE_HIGHDPI_SCALING"] = "0"  # Desativa o scaling automático
@@ -10,6 +9,7 @@ os.environ["QT_LOGGING_RULES"] = (
 )
 
 from pathlib import Path
+import signal
 import sys
 import threading
 import time
@@ -133,6 +133,10 @@ class WorkflowManager(QObject):
         workflow_thread.start()
 
     def _execute_workflow(self) -> None:
+        """Wrapper síncrono para executar o workflow assíncrono."""
+        asyncio.run(self._execute_workflow_async())
+
+    async def _execute_workflow_async(self) -> None:
         """Executa o fluxo principal de captura, correção e colagem.
 
         Esta função roda em sua própria thread.
@@ -147,7 +151,7 @@ class WorkflowManager(QObject):
             if not selected_text:
                 return
 
-            corrected_text = self._correct_text(selected_text, state)
+            corrected_text = await self._correct_text_async(selected_text, state)
             if not corrected_text:
                 return
 
@@ -219,12 +223,12 @@ class WorkflowManager(QObject):
         if self.gui_window:
             self.update_status.emit(error_message, is_error=True)
 
-    def _correct_text(self, selected_text: str, state: dict) -> str | None:
+    async def _correct_text_async(self, selected_text: str, state: dict) -> str | None:
         """Executa a correção do texto via OpenAI."""
         logger.info("Etapa 2: Correção do Texto (Chamando Agente OpenAI)")
 
         try:
-            corrected_text = get_corrected_text(selected_text, api_key=OPENAI_API_KEY)
+            corrected_text = await get_corrected_text(selected_text, api_key=OPENAI_API_KEY)
             if not corrected_text:
                 self._raise_correction_error()
 
@@ -441,15 +445,38 @@ if __name__ == "__main__":
     )
 
     # 6. Executa o loop de eventos do Qt na thread principal
-    exit_code = app.exec()
+    #    E configura o tratamento de sinal para Ctrl+C
+    #    Referência: https://doc.qt.io/qt-6/qcoreapplication.html#exec
+    
+    # Define o manipulador de sinal para chamar app.quit() ao receber SIGINT
+    def sigint_handler(*_):
+        logger.info("SIGINT recebido. Encerrando a aplicação...")
+        QApplication.instance().quit()
 
-    # 7. Cleanup ao sair do loop de eventos
-    logger.info("Loop de eventos Qt encerrado. Iniciando cleanup...")
+    signal.signal(signal.SIGINT, sigint_handler)
 
-    # Para o KeyboardManager
-    logger.info("Parando KeyboardManager...")
-    keyboard_manager.stop()
-    logger.info("KeyboardManager parado.")
+    # Usa um QTimer para permitir que o interpretador Python processe sinais.
+    # Sem isso, o loop de eventos do Qt pode bloquear o processamento de SIGINT.
+    timer = QTimer()
+    timer.start(500)  # Executa a cada 500ms
+    timer.timeout.connect(lambda: None)  # Apenas para manter o loop de eventos ativo
 
-    logger.info("Encerrando o serviço Texta AI...")
-    sys.exit(exit_code)
+    try:
+        logger.info("Iniciando o loop de eventos principal da aplicação...")
+        exit_code = app.exec()
+        logger.info(f"Loop de eventos encerrado com código: {exit_code}")
+
+    finally:
+        # 7. Cleanup ao sair do loop de eventos
+        logger.info("Iniciando cleanup final...")
+
+        # Para o KeyboardManager
+        if 'keyboard_manager' in locals() and keyboard_manager.running:
+            logger.info("Parando KeyboardManager...")
+            keyboard_manager.stop()
+            logger.info("KeyboardManager parado.")
+
+        logger.info("Encerrando o serviço Texta AI.")
+        # sys.exit(exit_code) # O exit_code pode não estar definido se houve exceção
+        sys.exit(0) # Sai com código de sucesso
+

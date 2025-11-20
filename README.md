@@ -26,50 +26,39 @@ A ferramenta funciona em qualquer aplicativo onde você possa selecionar e colar
 ## 🛠️ Requisitos
 
 - Python 3.9 ou superior
-- Chave de API da OpenAI
-- Bibliotecas Python (instaladas automaticamente pelo `pip`)
+- Chave de API da OpenAI (configurada em um arquivo `.env`)
+- Poetry para gerenciamento de dependências e ambiente virtual
 - Sistema operacional: Windows (testado no Windows 11)
 
 ## 📥 Instalação
-
-1. **Clone o Repositório**
+1. **Clone o Repositório** (se ainda não o fez)
    ```bash
    git clone https://github.com/seu-usuario/texta-ai.git
    cd texta-ai
    ```
 
-2. **Configure o Ambiente Virtual**
-   
-   É altamente recomendado usar um ambiente virtual para isolar as dependências do projeto.
-
-   No Windows:
+2. **Instale o Poetry** (se ainda não o tem)
+   Poetry é o gerenciador de dependências e ambientes virtuais preferido para este projeto.
    ```bash
-   # Criar ambiente virtual
-   python -m venv .venv
-   
-   # Ativar ambiente virtual
-   .venv\Scripts\activate
+   # Para Windows (execute no PowerShell):
+   (Invoke-WebRequest -Uri https://install.python-poetry.org -UseBasicParsing).Content | python -
+   # Para Linux/macOS:
+   curl -sSL https://install.python-poetry.org | python3 -
+   ```
+   Após a instalação, pode ser necessário reiniciar seu terminal ou adicionar o Poetry ao PATH.
+
+3. **Configure o Poetry para criar o ambiente virtual no projeto**
+   ```bash
+   poetry config virtualenvs.in-project true
    ```
 
-   No Linux/Mac:
+4. **Instale as Dependências do Projeto**
    ```bash
-   # Criar ambiente virtual
-   python -m venv .venv
-   
-   # Ativar ambiente virtual
-   source .venv/bin/activate
+   # Isso instalará todas as dependências principais e de desenvolvimento
+   poetry install --with dev
    ```
 
-3. **Instale as Dependências**
-   ```bash
-   # Atualizar pip para a última versão
-   python -m pip install --upgrade pip
-   
-   # Instalar dependências do projeto
-   pip install -r requirements.txt
-   ```
-
-4. **Configure o Arquivo .env**
+5. **Configure o Arquivo .env**
    
    Crie um arquivo `.env` na raiz do projeto copiando o arquivo de exemplo:
    ```bash
@@ -90,19 +79,19 @@ A ferramenta funciona em qualquer aplicativo onde você possa selecionar e colar
    ```
 
 5. **Verificação da Instalação**
+   Para verificar se tudo foi configurado corretamente:
    ```bash
-   # Verifique se o Python está correto
-   python --version  # Deve mostrar 3.9 ou superior
-   
-   # Verifique se as dependências foram instaladas
-   pip list  # Deve mostrar todas as bibliotecas necessárias
+   poetry run python --version # Deve mostrar 3.9 ou superior
+   poetry run pytest --version # Deve mostrar a versão do pytest
+   poetry run ruff --version   # Deve mostrar a versão do ruff
    ```
 
 ## 🚀 Uso
 
 1. Execute o programa:
    ```bash
-   python src/main.py
+   # Isso executa o script usando o ambiente virtual gerenciado pelo Poetry
+   poetry run python src/main.py
    ```
 
 2. A aplicação iniciará e ficará monitorando a tecla de atalho configurada no arquivo `.env` (padrão: `Ctrl+Alt+C`).
@@ -173,17 +162,17 @@ Se a ferramenta não estiver funcionando como esperado:
 Para executar os testes unitários e verificar a cobertura de código:
 
 ```bash
+# Ativa o ambiente virtual do Poetry e executa o pytest
+poetry run pytest
+
 # Executar todos os testes com relatório de cobertura
-pytest --cov=src tests/
+poetry run pytest --cov=src tests/
 
 # Executar testes com relatório detalhado de cobertura
-pytest --cov=src --cov-report=term-missing tests/
+poetry run pytest --cov=src --cov-report=term-missing tests/
 
 # Executar testes de um módulo específico
-pytest tests/test_capture.py
-
-# Executar testes com saída detalhada
-pytest -v tests/
+poetry run pytest tests/test_capture.py
 ```
 
 O relatório de cobertura mostrará a porcentagem de código coberto por testes para cada módulo em `src/`.

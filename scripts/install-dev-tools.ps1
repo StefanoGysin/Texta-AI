@@ -1,146 +1,123 @@
 # Script PowerShell de instalação das ferramentas de desenvolvimento para Texta AI
-# Uso: .\scripts\install-dev-tools.ps1
-
-# Configurar política de execução se necessário
-# Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
+# Uso: .\scripts\install-dev-tools.ps1 (execute no diretório raiz do projeto)
 
 # Cores para output
 $Green = "Green"
 $Yellow = "Yellow" 
 $Red = "Red"
+$Blue = "Blue"
 
 Write-Host "🚀 Instalando ferramentas de desenvolvimento para Texta AI" -ForegroundColor $Green
 Write-Host ""
 
-# Verificar se Python está instalado
-$pythonCmd = $null
-if (Get-Command python3 -ErrorAction SilentlyContinue) {
-    $pythonCmd = "python3"
-    $pipCmd = "pip3"
-}
-elseif (Get-Command python -ErrorAction SilentlyContinue) {
-    $pythonCmd = "python"
-    $pipCmd = "pip"
-}
-else {
-    Write-Host "❌ Python não encontrado. Instale o Python 3.9+ primeiro." -ForegroundColor $Red
-    Write-Host "Download: https://www.python.org/downloads/" -ForegroundColor $Yellow
-    exit 1
+function Check-Command {
+    param (
+        [string]$CommandName
+    )
+    (Get-Command $CommandName -ErrorAction SilentlyContinue) -ne $null
 }
 
-$pythonVersion = & $pythonCmd --version
-Write-Host "🐍 Usando Python: $pythonVersion" -ForegroundColor $Yellow
-
-# Verificar versão do Python
-$versionOutput = & $pythonCmd -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')"
-$version = [Version]$versionOutput
-$minVersion = [Version]"3.9"
-
-if ($version -lt $minVersion) {
-    Write-Host "❌ Python $versionOutput detectado. Este projeto requer Python 3.9 ou superior." -ForegroundColor $Red
-    exit 1
+# --- 1. Verificar e instalar Poetry ---
+Write-Host "🔍 Verificando instalação do Poetry..." -ForegroundColor $Yellow
+if (-not (Check-Command "poetry")) {
+    Write-Host "❌ Poetry não encontrado." -ForegroundColor $Red
+    Write-Host "   Instalando Poetry..." -ForegroundColor $Yellow
+    try {
+        Invoke-WebRequest -Uri https://install.python-poetry.org -UseBasicParsing | python -
+        # Adicionar Poetry ao PATH para a sessão atual, se necessário
+        $env:Path += ";$($env:APPDATA)\pypoetry\venv\Scripts"
+        Write-Host "✅ Poetry instalado. Pode ser necessário reiniciar o terminal." -ForegroundColor $Green
+    }
+    catch {
+        Write-Host "❌ Erro ao instalar Poetry: $_" -ForegroundColor $Red
+        Write-Host "   Por favor, instale manualmente: https://python-poetry.org/docs/#installation" -ForegroundColor $Yellow
+        exit 1
+    }
 }
+Write-Host "✅ Poetry encontrado." -ForegroundColor $Green
 
-Write-Host "✅ Python $versionOutput OK" -ForegroundColor $Green
-
-# Verificar se está em um ambiente virtual (recomendado)
-if ($env:VIRTUAL_ENV) {
-    Write-Host "✅ Ambiente virtual detectado: $env:VIRTUAL_ENV" -ForegroundColor $Green
-}
-else {
-    Write-Host "⚠️  Aviso: Não está em um ambiente virtual. Recomenda-se usar um venv." -ForegroundColor $Yellow
-    Write-Host "   Para criar um: python -m venv .venv && .venv\Scripts\Activate.ps1" -ForegroundColor $Yellow
-    Write-Host ""
-}
-
-# Atualizar pip
-Write-Host "📦 Atualizando pip..." -ForegroundColor $Yellow
+# --- 2. Configurar Poetry para criar ambiente virtual no projeto ---
+Write-Host "⚙️  Configurando Poetry para criar ambiente virtual no projeto..." -ForegroundColor $Yellow
 try {
-    & $pipCmd install --upgrade pip
-    Write-Host "✅ pip atualizado" -ForegroundColor $Green
+    poetry config virtualenvs.in-project true
+    Write-Host "✅ Configuração 'virtualenvs.in-project' definida para 'true'." -ForegroundColor $Green
 }
 catch {
-    Write-Host "❌ Erro ao atualizar pip: $_" -ForegroundColor $Red
+    Write-Host "❌ Erro ao configurar Poetry: $_" -ForegroundColor $Red
     exit 1
 }
 
-# Instalar dependências principais
-Write-Host "📦 Instalando dependências principais..." -ForegroundColor $Yellow
+# --- 3. Verificar pyproject.toml ---
+Write-Host "🔍 Verificando 'pyproject.toml'..." -ForegroundColor $Yellow
+if (-not (Test-Path "pyproject.toml")) {
+    Write-Host "❌ Arquivo 'pyproject.toml' não encontrado no diretório atual." -ForegroundColor $Red
+    Write-Host "   Certifique-se de executar este script no diretório raiz do projeto." -ForegroundColor $Yellow
+    exit 1
+}
+Write-Host "✅ 'pyproject.toml' encontrado." -ForegroundColor $Green
+
+# --- 4. Instalar dependências ---
+Write-Host "📦 Instalando dependências principais e de desenvolvimento com Poetry..." -ForegroundColor $Yellow
 try {
-    & $pipCmd install -r requirements.txt
-    Write-Host "✅ Dependências principais instaladas" -ForegroundColor $Green
+    poetry install --with dev
+    Write-Host "✅ Dependências instaladas com sucesso." -ForegroundColor $Green
 }
 catch {
-    Write-Host "❌ Erro ao instalar dependências principais: $_" -ForegroundColor $Red
+    Write-Host "❌ Erro ao instalar dependências com Poetry: $_" -ForegroundColor $Red
+    Write-Host "   Verifique o 'pyproject.toml' e a saída do erro acima." -ForegroundColor $Yellow
     exit 1
 }
 
-# Instalar dependências de desenvolvimento via pyproject.toml
-Write-Host "🛠️  Instalando dependências de desenvolvimento..." -ForegroundColor $Yellow
+# --- 5. Verificar versão do Python (via Poetry) ---
+Write-Host "🐍 Verificando versão do Python no ambiente Poetry..." -ForegroundColor $Yellow
 try {
-    & $pipCmd install -e ".[dev]"
-    Write-Host "✅ Dependências de desenvolvimento instaladas" -ForegroundColor $Green
+    $pythonVersion = (poetry run python -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}')")
+    $minVersion = [Version]"3.9"
+    $currentVersion = [Version]$pythonVersion
+
+    if ($currentVersion -lt $minVersion) {
+        Write-Host "❌ Python $pythonVersion detectado no ambiente Poetry. Este projeto requer Python 3.9 ou superior." -ForegroundColor $Red
+        Write-Host "   Considere usar 'poetry env use pythonX.Y' para selecionar uma versão compatível." -ForegroundColor $Yellow
+        exit 1
+    }
+    Write-Host "✅ Python $pythonVersion OK no ambiente Poetry." -ForegroundColor $Green
 }
 catch {
-    Write-Host "❌ Erro ao instalar dependências de desenvolvimento: $_" -ForegroundColor $Red
+    Write-Host "❌ Erro ao verificar a versão do Python no ambiente Poetry: $_" -ForegroundColor $Red
     exit 1
 }
 
-# Verificar instalação das ferramentas
+# --- 6. Verificar instalação das ferramentas de desenvolvimento ---
 Write-Host ""
-Write-Host "🔍 Verificando instalação das ferramentas..." -ForegroundColor $Yellow
+Write-Host "🔍 Verificando instalação das ferramentas de desenvolvimento..." -ForegroundColor $Yellow
 
-# Verificar Ruff
-try {
-    $ruffVersion = & ruff --version
-    Write-Host "✅ Ruff: $ruffVersion" -ForegroundColor $Green
-}
-catch {
-    Write-Host "❌ Ruff não instalado corretamente" -ForegroundColor $Red
-    exit 1
+$tools = @{
+    "Ruff" = "ruff --version"
+    "pytest" = "pytest --version"
 }
 
-# Verificar Black
-try {
-    $blackVersion = & black --version
-    Write-Host "✅ Black: $($blackVersion -split '\n')[0]" -ForegroundColor $Green
-}
-catch {
-    Write-Host "❌ Black não instalado corretamente" -ForegroundColor $Red
-    exit 1
-}
-
-# Verificar isort
-try {
-    $isortVersion = & isort --version
-    Write-Host "✅ isort: $($isortVersion -split '\n')[0]" -ForegroundColor $Green
-}
-catch {
-    Write-Host "❌ isort não instalado corretamente" -ForegroundColor $Red
-    exit 1
-}
-
-# Verificar pytest
-try {
-    $pytestVersion = & pytest --version
-    Write-Host "✅ pytest: $($pytestVersion -split '\n')[0]" -ForegroundColor $Green
-}
-catch {
-    Write-Host "❌ pytest não instalado corretamente" -ForegroundColor $Red
-    exit 1
+foreach ($tool in $tools.GetEnumerator()) {
+    try {
+        $output = (poetry run $($tool.Value) | Select-String -Pattern "version" -CaseSensitive -SimpleMatch | Select-Object -First 1).ToString().Trim()
+        Write-Host "✅ $($tool.Name): $($output)" -ForegroundColor $Green
+    }
+    catch {
+        Write-Host "❌ $($tool.Name) não instalado ou não funcionando corretamente: $_" -ForegroundColor $Red
+        exit 1
+    }
 }
 
 Write-Host ""
-Write-Host "🎉 Instalação concluída com sucesso!" -ForegroundColor $Green
+Write-Host "🎉 Instalação e configuração concluídas com sucesso!" -ForegroundColor $Green
 Write-Host ""
 Write-Host "📋 Próximos passos:" -ForegroundColor $Yellow
-Write-Host "  1. Execute " -NoNewline; Write-Host "python scripts/dev-tools.py check" -ForegroundColor $Green -NoNewline; Write-Host " para verificar o código"
-Write-Host "  2. Execute " -NoNewline; Write-Host "python scripts/dev-tools.py format" -ForegroundColor $Green -NoNewline; Write-Host " para formatar o código"
-Write-Host "  3. Execute " -NoNewline; Write-Host "pytest" -ForegroundColor $Green -NoNewline; Write-Host " para rodar os testes"
+Write-Host "  1. Ative o ambiente virtual com " -NoNewline; Write-Host "poetry shell" -ForegroundColor $Blue
+Write-Host "  2. Para executar comandos, use " -NoNewline; Write-Host "poetry run [comando]" -ForegroundColor $Blue
 Write-Host ""
 Write-Host "💡 Comandos úteis:" -ForegroundColor $Yellow
-Write-Host "  • " -NoNewline; Write-Host "python scripts/dev-tools.py all" -ForegroundColor $Green -NoNewline; Write-Host "  - Pipeline completo (fix + format + check + test)"
-Write-Host "  • " -NoNewline; Write-Host "python scripts/dev-tools.py fix" -ForegroundColor $Green -NoNewline; Write-Host "   - Correções automáticas"
-Write-Host "  • " -NoNewline; Write-Host "ruff check src/" -ForegroundColor $Green -NoNewline; Write-Host "             - Verificação direta"
+Write-Host "  • " -NoNewline; Write-Host "poetry run ruff check --fix ." -ForegroundColor $Green -NoNewline; Write-Host "   - Verifica e corrige problemas de linting e formatação"
+Write-Host "  • " -NoNewline; Write-Host "poetry run ruff format ." -ForegroundColor $Green -NoNewline; Write-Host "      - Formata o código"
+Write-Host "  • " -NoNewline; Write-Host "poetry run pytest" -ForegroundColor $Green -NoNewline; Write-Host "                - Executa a suíte de testes"
+Write-Host "  • " -NoNewline; Write-Host "poetry run python src/main.py" -ForegroundColor $Green -NoNewline; Write-Host "      - Inicia a aplicação"
 Write-Host ""
-Write-Host "✨ Desenvolvimento com qualidade configurado!" -ForegroundColor $Green 
+Write-Host "✨ Desenvolvimento com qualidade configurado!" -ForegroundColor $Green

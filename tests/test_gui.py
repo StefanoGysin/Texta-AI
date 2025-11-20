@@ -1,5 +1,5 @@
 import sys
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock, patch, AsyncMock
 
 from PySide6.QtCore import QPoint, Qt, Signal
 from PySide6.QtWidgets import QApplication
@@ -177,9 +177,10 @@ def test_workflow_manager_update_gui_signals(mocker):  # noqa: ARG001
     corrected_text = "texto corrigido"
 
     # Patch várias funções para não executarem ações reais
+    mock_get_corrected_text = AsyncMock(return_value=corrected_text)
     with (
         patch("src.main.capture_selected_text", return_value=original_text),
-        patch("src.main.get_corrected_text", return_value=corrected_text),
+        patch("src.main.get_corrected_text", new=mock_get_corrected_text),
         patch("src.main.paste_text"),
         patch("time.sleep"),
         patch("pyperclip.paste", return_value=""),
@@ -269,7 +270,7 @@ def test_app_icon_setup(gui_window, mocker):
 def test_app_icon_setup_no_logo(gui_window, mocker):
     """Testa o comportamento quando o arquivo de logo não existe."""
     # Mock para verificar se o arquivo existe (retornando False)
-    mocker.patch("os.path.exists", return_value=False)
+    mocker.patch("pathlib.Path.exists", return_value=False)
     # Mock para QIcon para evitar operações reais com arquivos
     mock_qicon = mocker.patch("src.gui.QIcon")
     # Mock para setWindowIcon
